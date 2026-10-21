@@ -21,8 +21,11 @@ export type OwnerInfo = {
 }
 
 export class LockBusyError extends Error {
-  constructor(public owner: OwnerInfo | null) {
-    super(owner ? `專案正由另一個 Nodit ${owner.mode}（pid ${owner.pid}）寫入中` : '專案正由另一個 Nodit 程序寫入中')
+  constructor(
+    public owner: OwnerInfo | null,
+    message?: string,
+  ) {
+    super(message ?? (owner ? `專案正由另一個 Nodit ${owner.mode}（pid ${owner.pid}）寫入中` : '專案正由另一個 Nodit 程序寫入中'))
   }
 }
 
@@ -160,9 +163,10 @@ async function readHolder(file: string): Promise<ReclaimHolder | 'unreadable' | 
 
 /**
  * Reclaim mutex as a file holding { pid, host, token }, created atomically with link(). It is never
- * taken over by age: a reclaimer that is merely paused keeps it, so it cannot wake up and delete a
- * lock someone else created meanwhile. Only a holder known to have exited (same host, pid gone) is
- * cleared, and the attempt that clears it still reports busy.
+ * removed by anyone but its holder: not by age, and not when the holder looks dead, because
+ * "checked it is dead" and "removed it" cannot be one atomic step and a paused process can stretch
+ * that gap until it deletes a successor's mutex. A mutex left by a crashed reclaimer therefore
+ * blocks writes until a person removes it; the error says which file and why.
  */
 async function takeReclaimMutex(p: ReturnType<typeof lockPaths>): Promise<() => Promise<void>> {
   const me: ReclaimHolder = { pid: process.pid, host: hostname(), token: randomUUID() }
@@ -172,8 +176,7 @@ async function takeReclaimMutex(p: ReturnType<typeof lockPaths>): Promise<() => 
     await link(tmp, p.reclaim)
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
-    await clearDeadReclaimer(p.reclaim)
-    throw busy()
+    throw new LockBusyError(null, await describeReclaimer(p.reclaim))
   } finally {
     await unlink(tmp).catch(() => {})
   }
@@ -183,26 +186,25 @@ async function takeReclaimMutex(p: ReturnType<typeof lockPaths>): Promise<() => 
   }
 }
 
-async function clearDeadReclaimer(file: string) {
+async function describeReclaimer(file: string) {
+  const manual = `確認沒有任何 Nodit 程序在執行後，手動刪除 ${file} 再重試`
   const entry = await lstat(file).catch(() => null)
-  if (!entry) return
-  // directory left by an older Nodit version, which has no holder identity: age is all there is
-  if (entry.isDirectory()) {
-    if (isStale(entry.mtimeMs)) await rmdir(file).catch(() => {})
-    return
-  }
+  if (!entry) return '另一個 Nodit 程序剛完成過期寫入鎖的回收，請重試'
+  if (entry.isDirectory()) return `過期寫入鎖的回收標記是舊版 Nodit 留下的。${manual}`
   const held = await readHolder(file)
-  if (!held || held === 'unreadable' || held.host !== hostname() || processAlive(held.pid)) return
-  const again = await readHolder(file)
-  if (again && again !== 'unreadable' && again.token === held.token) await unlink(file).catch(() => {})
+  if (held === null) return '另一個 Nodit 程序剛完成過期寫入鎖的回收，請重試'
+  if (held === 'unreadable') return `過期寫入鎖的回收標記內容無法辨識。${manual}`
+  if (held.host !== hostname()) return `過期寫入鎖正由另一台主機（${held.host}，pid ${held.pid}）回收中。若該程序已不存在，${manual}`
+  if (processAlive(held.pid)) return `另一個 Nodit 程序（pid ${held.pid}）正在回收過期的寫入鎖`
+  return `回收過期寫入鎖的程序（pid ${held.pid}）已中止，沒有清除回收標記。${manual}`
 }
 
 /**
  * proper-lockfile reclaims a stale lock with stat → rmdir → mkdir, so a process acting on an older
  * stat can delete the lock another process just created and both end up holding it. We remove a
- * stale lock ourselves, only while holding the reclaim mutex, only after re-checking it there and
- * only if it is still the same directory; proper-lockfile then never sees a stale lock and the winner
- * is decided by its atomic mkdir.
+ * stale lock ourselves, only while holding the reclaim mutex (one holder at a time, see above) and
+ * after re-checking it there; proper-lockfile then never sees a stale lock and the winner is decided
+ * by its atomic mkdir.
  */
 async function reclaimStale(p: ReturnType<typeof lockPaths>) {
   const current = await stat(p.lockfilePath).catch(() => null)
@@ -214,9 +216,7 @@ async function reclaimStale(p: ReturnType<typeof lockPaths>) {
   const release = await takeReclaimMutex(p)
   try {
     const again = await stat(p.lockfilePath).catch(() => null)
-    if (!again || !isStale(again.mtimeMs)) return
-    const now = await stat(p.lockfilePath).catch(() => null)
-    if (now && now.ino === again.ino && now.mtimeMs === again.mtimeMs) await rmdir(p.lockfilePath).catch(() => {})
+    if (again && isStale(again.mtimeMs)) await rmdir(p.lockfilePath).catch(() => {})
   } finally {
     await release()
   }

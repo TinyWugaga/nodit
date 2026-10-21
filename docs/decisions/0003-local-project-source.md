@@ -25,6 +25,7 @@ Nodit 原本把資料存在瀏覽器 localStorage，跟實際專案脫節。要�
 - **寫入協定**：
   - 每份文件的 revision 是原始位元組的 sha1。更新、刪除、連線修改都帶 `baseRevision`，不符就回 409，不寫入。
   - 同一時間只有一個 writer。lock 用 `proper-lockfile`，所有入口共用 `core/owner.ts` 的 `LOCK_OPTIONS`。
+  - 過期 lock 不交給 `proper-lockfile` 回收（它的 stat → rmdir → mkdir 會讓兩個程序同時取得）。Nodit 先取得 `.nodit/writer.lock.reclaim`（以 `link` 原子建立，記錄 pid、主機、token），持有期間重查仍過期才刪除。這個回收標記只由持有者自己移除，不論逾時或持有者已結束都不自動接管；回收途中崩潰留下的標記會讓寫入回報 busy，訊息指出檔案位置，需人工確認後刪除（2026-10-21 起）。
   - 收到 `onCompromised` 時停止所有寫入，並透過 SSE 通知 UI。
   - CLI 遇到 server 持有 lock 時，先打 health 並核對 owner 與 session，再改走 API；health 沒有回應就失敗，不接管 lock。
   - 更新時先寫同目錄的暫存檔再 rename；新建時用 `wx`。新卡片的 ID 在寫入佇列內配發：重新掃描磁碟，取最大值 + 1。

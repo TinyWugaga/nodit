@@ -97,12 +97,20 @@ it('a paused reclaimer keeps the reclaim mutex however old it is', async () => {
     expect((await stat(stale.lockfilePath)).ino).toBe(before)
     expect(JSON.parse(await readFile(p.reclaim, 'utf8')).token).toBe('held-elsewhere')
 
-    // once the holder is gone, the next attempt clears its mutex and the one after reclaims
+    // a dead holder is not cleared automatically either: that check-then-delete is itself racy
     const exited = new Promise((r) => child.on('exit', r))
     child.kill()
     await exited
-    await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
-    await expect(stat(p.reclaim)).rejects.toMatchObject({ code: 'ENOENT' })
+    for (let i = 0; i < 3; i++) {
+      const err = await acquireOwner(root, 'cli').catch((e) => e)
+      expect(err).toBeInstanceOf(LockBusyError)
+      expect(err.message).toContain('手動刪除')
+    }
+    expect(JSON.parse(await readFile(p.reclaim, 'utf8')).token).toBe('held-elsewhere')
+    expect((await stat(stale.lockfilePath)).ino).toBe(before)
+
+    // manual recovery: once a person removes the mutex, the stale lock is reclaimed
+    await rm(p.reclaim)
     const owner = await acquireOwner(root, 'cli')
     await owner.release()
   } finally {
@@ -114,6 +122,19 @@ it('a reclaim mutex from another host is never taken over', async () => {
   await lockAged(60_000)
   const p = await holdReclaim({ pid: 1, host: 'some-other-host' })
   await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
-  await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+  const err = await acquireOwner(root, 'cli').catch((e) => e)
+  expect(err.message).toContain('some-other-host')
   expect(JSON.parse(await readFile(p.reclaim, 'utf8')).host).toBe('some-other-host')
+})
+
+it('a reclaim mutex directory from an older version is left for manual recovery', async () => {
+  await lockAged(60_000)
+  const p = lockPaths(root)
+  await mkdir(p.reclaim)
+  const old = new Date(Date.now() - 60_000)
+  await utimes(p.reclaim, old, old)
+  const err = await acquireOwner(root, 'cli').catch((e) => e)
+  expect(err).toBeInstanceOf(LockBusyError)
+  expect(err.message).toContain('舊版')
+  expect((await stat(p.reclaim)).isDirectory()).toBe(true)
 })

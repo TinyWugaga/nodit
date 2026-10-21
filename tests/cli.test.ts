@@ -93,6 +93,8 @@ describe('lock recovery', () => {
     const script = path.join(REPO, 'tests/fixtures/acquire.ts')
     const child = () => {
       const c = spawn(TSX, [script, root], { cwd: REPO })
+      // a child that reported busy exits on its own; writing "release" to it must not fail the run
+      c.stdin.on('error', () => {})
       const lines: string[] = []
       const waiters: (() => void)[] = []
       c.stdout.setEncoding('utf8').on('data', (chunk: string) => {
