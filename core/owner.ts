@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
+import fs from 'node:fs'
 import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
@@ -114,6 +115,29 @@ function busy(): NodeJS.ErrnoException {
 }
 
 /**
+ * fs for proper-lockfile that may only remove the lock this acquisition created itself. Its own
+ * stale reclaim (stat → rmdir → mkdir) then fails with ELOCKED instead of racing, even if the lock
+ * crosses the stale threshold after `reclaimStale` looked at it. Release and cleanup still work.
+ */
+export function noReclaimFs(lockfilePath: string): typeof fs {
+  let created = false
+  const guarded = { ...fs }
+  guarded.mkdir = ((target: fs.PathLike, ...rest: unknown[]) => {
+    const cb = rest.pop() as (err: NodeJS.ErrnoException | null) => void
+    fs.mkdir(target, ...(rest as []), (err: NodeJS.ErrnoException | null) => {
+      if (!err && String(target) === lockfilePath) created = true
+      cb(err)
+    })
+  }) as typeof fs.mkdir
+  guarded.rmdir = ((target: fs.PathLike, ...rest: unknown[]) => {
+    const cb = rest.pop() as (err: NodeJS.ErrnoException | null) => void
+    if (String(target) === lockfilePath && !created) return cb(busy())
+    fs.rmdir(target, ...(rest as []), cb)
+  }) as typeof fs.rmdir
+  return guarded
+}
+
+/**
  * proper-lockfile reclaims a stale lock with stat → rmdir → mkdir, so a process acting on an older
  * stat can delete the lock another process just created and both end up holding it. We remove a
  * stale lock ourselves, only while holding the reclaim mutex and only after re-checking it there;
@@ -123,7 +147,7 @@ async function reclaimStale(p: ReturnType<typeof lockPaths>) {
   const current = await stat(p.lockfilePath).catch(() => null)
   if (!current) return
   if (!isStale(current.mtimeMs)) {
-    if (isStale(current.mtimeMs + NEAR_STALE_MARGIN)) throw busy()
+    if (isStale(current.mtimeMs - NEAR_STALE_MARGIN)) throw busy()
     return
   }
   try {
@@ -163,6 +187,7 @@ export async function acquireOwner(root: string, mode: OwnerMode, sessionId = ra
     release = await lockfile.lock(p.dir, {
       ...LOCK_OPTIONS,
       lockfilePath: p.lockfilePath,
+      fs: noReclaimFs(p.lockfilePath),
       onCompromised: (err) => owner?.markCompromised(err),
     })
   } catch (err) {

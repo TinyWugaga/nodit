@@ -216,6 +216,7 @@ async function cmdInit(argv: string[]) {
       const ids = await decide(r.body)
       if (!ids) return
       const applied = await api('POST', '/api/init/apply', { planId: r.body.planId, itemIds: ids })
+      if (applied.status === 422 && Array.isArray(applied.body.diagnostics)) throw new ValidationError(applied.body.diagnostics)
       if (applied.status !== 200) throw new CliError(`server 回應 ${applied.status}：${applied.body.error ?? ''}`)
       report(applied.body.results)
     },
@@ -251,6 +252,7 @@ async function cmdImport(argv: string[]) {
       async (api) => {
         const r = await api('POST', '/api/import', { text })
         if (r.status === 200) return r.body.report
+        if (r.status === 422 && Array.isArray(r.body.diagnostics)) throw new ValidationError(r.body.diagnostics)
         throw importFailure(r.body.error ?? `server 回應 ${r.status}`, r.body.conflicts)
       },
     )
