@@ -77,13 +77,14 @@ export async function loadConfig(root: string): Promise<{ config: NoditConfig; e
   }
 
   if (data.schemaVersion !== undefined && data.schemaVersion > SCHEMA_VERSION) {
-    diagnostics.push({ level: 'error', code: 'config-version', message: `schemaVersion ${data.schemaVersion} 比目前支援的 ${SCHEMA_VERSION} 新` })
+    return invalid(`的 schemaVersion ${data.schemaVersion} 比目前支援的 ${SCHEMA_VERSION} 新`)
   }
+  // a bad path rejects the whole file: silently using the default would write cards elsewhere
   const paths = { ...DEFAULT_PATHS }
   for (const [k, v] of Object.entries(data.paths ?? {})) {
     if (!(k in paths)) continue
-    if (safeRelative(v)) paths[k as keyof NoditPaths] = path.posix.normalize(v.replace(/\\/g, '/'))
-    else diagnostics.push({ level: 'error', code: 'config-path', message: `paths.${k} 必須是專案內的相對路徑` })
+    if (!safeRelative(v)) return invalid(`的 paths.${k} 必須是專案內的相對路徑`)
+    paths[k as keyof NoditPaths] = path.posix.normalize(v.replace(/\\/g, '/'))
   }
 
   return {

@@ -1,5 +1,6 @@
 import type { Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
 import type { CreateResult, DeleteResult, Failure, ImportResult, InitPlanView, InitResultView, LayoutResult, LinkChange, NewCardInput, ProjectClient, SubscribeHandlers } from './client'
+import { metaOf } from './sync'
 
 type Raw = { status: number; body: any; error?: string }
 
@@ -90,8 +91,8 @@ export class HttpProjectClient implements ProjectClient {
 
   async putLayout(baseRevision: string, data: Record<string, { x: number; y: number }>): Promise<LayoutResult> {
     const r = await this.send('PUT', '/api/layout', { baseRevision, data })
-    if (r.status === 200) return { ok: true, revision: r.body.revision }
-    if (r.status === 409) return { ok: false, reason: 'conflict', layout: r.body.layout }
+    if (r.status === 200) return { ok: true, revision: r.body.revision, meta: metaOf(r.body) }
+    if (r.status === 409) return { ok: false, reason: 'conflict', layout: r.body.layout, meta: metaOf(r.body) }
     return this.failure(r)
   }
 

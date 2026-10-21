@@ -94,10 +94,11 @@ describe('lock recovery', () => {
     await mkdir(p.lockfilePath, { recursive: true })
     const old = new Date(Date.now() - 60_000)
     await utimes(p.lockfilePath, old, old)
-    const startAt = String(Date.now() + 2500)
+    // both processes must be running before startAt even when tsx starts slowly under load
+    const startAt = String(Date.now() + 6000)
     const script = path.join(REPO, 'tests/fixtures/acquire.ts')
     const outs = await Promise.all([1, 2].map(() => run(TSX, [script, root, startAt], { cwd: REPO }).then((r) => r.stdout.trim())))
-    expect(outs.sort()).toEqual(['busy', 'ok'])
+    expect(outs.sort(), outs.join(' / ')).toEqual(['busy', 'ok'])
   }, 30_000)
 })
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cp, mkdir, mkdtemp, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -87,8 +87,8 @@ describe('independent acceptance probes',()=>{
  it('A14 rename and atomic save retain ID/layout and recover after invalid raw',async()=>{
   const root=await fixture(),s=await serve(root),old=doc(s);const renamed='docs/tasks/T-003-renamed.md';
   await rename(path.join(root,T3),path.join(root,renamed));await s.project.rescan();expect(doc(s,renamed).card?.id).toBe(old.card?.id);expect(doc(s,renamed).docKey).not.toBe(old.docKey);
-  const before=await readFile(path.join(root,renamed),'utf8');await writeFile(path.join(root,renamed+'.tmp'),before.replace('側欄編輯器','atomic save'));await rename(path.join(root,renamed+'.tmp'),path.join(root,renamed));await sleep(400);
-  expect(doc(s,renamed).card?.title).toBe('atomic save')
+  const before=await readFile(path.join(root,renamed),'utf8');await writeFile(path.join(root,renamed+'.tmp'),before.replace('側欄編輯器','atomic save'));await rename(path.join(root,renamed+'.tmp'),path.join(root,renamed));
+  await vi.waitFor(()=>expect(doc(s,renamed).card?.title).toBe('atomic save'),{timeout:5000})
  })
  it('A15 no-op metadata leaves revision and mtime unchanged',async()=>{
   const root=await fixture(),s=await serve(root),d=doc(s);const file=path.join(root,T3);const before=await stat(file);const rev=s.project.rev;
@@ -100,8 +100,9 @@ describe('independent acceptance probes',()=>{
  })
  it('A19 running server survives null config and keeps prior config',async()=>{
   const root=await fixture(),s=await serve(root);const first=s.project.snapshot();
-  await writeFile(path.join(root,'nodit.config.json'),'null');await sleep(400);
-  const snap=s.project.snapshot();expect(snap.projectId).toBe(first.projectId);expect(snap.diagnostics.some(d=>d.code==='config-invalid')).toBe(true);
+  await writeFile(path.join(root,'nodit.config.json'),'null');
+  await vi.waitFor(()=>expect(s.project.snapshot().diagnostics.some(d=>d.code==='config-invalid')).toBe(true),{timeout:5000});
+  expect(s.project.snapshot().projectId).toBe(first.projectId);
   expect((await fetch(`http://127.0.0.1:${s.port}/api/health`)).status).toBe(200)
  })
  it('A20 project payload carries config and per-component status',async()=>{
@@ -114,9 +115,10 @@ describe('independent acceptance probes',()=>{
  })
  it('A17 watcher follows config path changes',async()=>{
   const root=await fixture(),s=await serve(root),file=path.join(root,'nodit.config.json'),config=JSON.parse(await readFile(file,'utf8'));
-  await mkdir(path.join(root,'moved-tasks'));config.paths.task='moved-tasks';await writeFile(file,JSON.stringify(config));await sleep(400);
-  await writeFile(path.join(root,'moved-tasks/T-091-moved.md'),'---\nid: T-091\ntype: task\ntitle: new watched dir\nstatus: todo\n---\n');await sleep(600);
-  expect(s.project.snapshot().docs.some(d=>d.card?.id==='T-091')).toBe(true)
+  await mkdir(path.join(root,'moved-tasks'));config.paths.task='moved-tasks';await writeFile(file,JSON.stringify(config));
+  await vi.waitFor(()=>expect(s.project.config.paths.task).toBe('moved-tasks'),{timeout:5000});
+  await writeFile(path.join(root,'moved-tasks/T-091-moved.md'),'---\nid: T-091\ntype: task\ntitle: new watched dir\nstatus: todo\n---\n');
+  await vi.waitFor(()=>expect(s.project.snapshot().docs.some(d=>d.card?.id==='T-091')).toBe(true),{timeout:5000})
  })
  it('A18 queued operations stop and error propagates after compromised',async()=>{
   const root=await fixture(),s=await serve(root);const d=doc(s);s.owner.markCompromised(new Error('simulated'));const rs=await Promise.all([1,2,3].map(()=>send(s,'PATCH',`/api/docs/${d.docKey}`,{baseRevision:d.revision,fields:{title:'blocked'}})));expect(rs.map(r=>r.status)).toEqual([503,503,503]);expect(LOCK_OPTIONS).toMatchObject({stale:10000,update:2000})

@@ -309,14 +309,19 @@ export const useProject = create<State>()(
         const pending = { ...pendingLayout }
         const data = { ...placed, ...get().layout, ...pending }
         const result = await client.putLayout(get().layoutRevision, data)
+        // a response older than the loaded snapshot must not roll the layout back
+        const fresh = (meta: Meta) => {
+          const current = get().meta
+          return !current || (meta.sessionId === current.sessionId && meta.rev > current.rev)
+        }
         if (result.ok) {
           for (const [code, p] of Object.entries(pending)) if (pendingLayout[code] === p) delete pendingLayout[code]
-          set({ layout: data, layoutRevision: result.revision })
+          if (fresh(result.meta)) set({ layout: data, layoutRevision: result.revision })
           return
         }
         if (result.reason === 'conflict' && 'layout' in result && retry) {
           // positions only: take the newer file and re-apply our current positions on top
-          set({ layout: result.layout.data, layoutRevision: result.layout.revision })
+          if (fresh(result.meta)) set({ layout: result.layout.data, layoutRevision: result.layout.revision })
           return saveLayout(false)
         }
         toast(`版面座標沒有存檔：${'message' in result ? result.message : '衝突'}`)

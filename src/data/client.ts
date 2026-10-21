@@ -25,8 +25,8 @@ export type Failure = { ok: false; reason: 'conflict' | 'invalid' | 'auth' | 'co
 export type CreateResult = { ok: true; envelope: Envelope<{ doc: ClientDoc }> } | Failure
 export type DeleteResult = { ok: true; envelope: Envelope<object> } | Failure
 export type LayoutResult =
-  | { ok: true; revision: string }
-  | { ok: false; reason: 'conflict'; layout: ProjectPayload['layout'] }
+  | { ok: true; revision: string; meta: Meta }
+  | { ok: false; reason: 'conflict'; layout: ProjectPayload['layout']; meta: Meta }
   | Failure
 
 /** Transport-agnostic access to one project. HTTP today; IPC if Nodit is ever wrapped in Electron. */

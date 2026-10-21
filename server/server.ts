@@ -176,6 +176,9 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
     if (method === 'POST' && p === '/api/cards') {
       const body = (await readBody(req)) as Partial<NewCard>
       if (typeof body.type !== 'string' || typeof body.title !== 'string') throw new HttpError(400, 'type and title are required')
+      if (!project.configAccepted) {
+        return json(res, 422, project.envelope({ diagnostics: project.snapshot().diagnostics.filter((d) => d.code === 'config-invalid') }))
+      }
       return mutation(res, null, async () => {
         const created = await writer.createCard(body as NewCard)
         const doc = await project.applyWritten(created)
@@ -190,8 +193,8 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
       }
       try {
         const layout = await writer.writeLayout(body.baseRevision, body.data as Record<string, { x: number; y: number }>)
-        await project.applyLayout(layout)
-        return json(res, 200, project.envelope({ revision: layout.revision }))
+        const rev = await project.applyLayout(layout)
+        return json(res, 200, { ...project.envelope({ revision: layout.revision }), rev })
       } catch (err) {
         if (err instanceof ConflictError) {
           await project.rescan()

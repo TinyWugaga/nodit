@@ -12,8 +12,10 @@ async function listMarkdown(root: string, rel: string): Promise<string[]> {
   let entries: string[]
   try {
     entries = (await readdir(path.join(root, rel), { recursive: true })) as string[]
-  } catch {
-    return []
+  } catch (err) {
+    // a missing folder is empty; any other failure must not look like "all cards were deleted"
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw err
   }
   return entries
     .map((e) => e.split(path.sep).join('/'))
@@ -31,22 +33,22 @@ export async function readDoc(root: string, rel: string, kind: CardKind): Promis
     return parseDoc(rel, await readFile(await resolveReadable(root, rel)), kind)
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
-    if (err instanceof ScopeError) return outsideDoc(rel, kind, err.message)
-    throw err
+    if (err instanceof ScopeError) return unreadableDoc(rel, kind, 'path-outside', err.message)
+    return unreadableDoc(rel, kind, 'read-failed', `無法讀取檔案：${(err as Error).message}`)
   }
 }
 
-/** Placeholder for a symlink leaving the project: listed with a diagnostic, never read. */
-function outsideDoc(rel: string, kind: CardKind, message: string): ParsedDoc {
+/** Placeholder for a file that cannot be read (or must not be): listed with a diagnostic only. */
+function unreadableDoc(rel: string, kind: CardKind, code: string, message: string): ParsedDoc {
   const docKey = docKeyOf(rel)
   return {
     docKey,
     path: rel,
     kind,
-    revision: 'outside',
+    revision: code,
     sectionStates: {},
     sections: {},
-    diagnostics: [{ level: 'error', code: 'path-outside', message, docKey, path: rel }],
+    diagnostics: [{ level: 'error', code, message, docKey, path: rel }],
     legacy: false,
     inferred: [],
     writable: false,
