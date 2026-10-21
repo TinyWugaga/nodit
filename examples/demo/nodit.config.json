@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "projectId": "nodit-demo",
+  "paths": {},
+  "watch": {
+    "usePolling": false
+  },
+  "managed": {}
+}

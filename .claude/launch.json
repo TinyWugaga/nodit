@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nodit-server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "server/cli.ts",
+        "examples/demo",
+        "--port",
+        "4319",
+        "--dev-origin",
+        "http://localhost:5174"
+      ],
+      "port": 4319
+    },
+    {
+      "name": "nodit",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174
+    }
+  ]
+}

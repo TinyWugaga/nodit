@@ -1,0 +1,7 @@
+node_modules
+dist
+.DS_Store
+*.local
+**/.nodit/writer.lock
+**/.nodit/owner.json
+**/.nodit/token
