@@ -87,7 +87,7 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
     await owner.release()
     throw err
   }
-  const writer = new Writer(root, () => project.config, owner)
+  const writer = new Writer(root, () => project.config, owner, () => project.configProblems())
   const hub = new EventHub(project)
   const plans = new Map<string, InitPlan>()
   owner.onCompromised((err) => hub.broadcast('writer-compromised', project.envelope({ message: err.message })))
@@ -176,9 +176,6 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
     if (method === 'POST' && p === '/api/cards') {
       const body = (await readBody(req)) as Partial<NewCard>
       if (typeof body.type !== 'string' || typeof body.title !== 'string') throw new HttpError(400, 'type and title are required')
-      if (!project.configAccepted) {
-        return json(res, 422, project.envelope({ diagnostics: project.snapshot().diagnostics.filter((d) => d.code === 'config-invalid') }))
-      }
       return mutation(res, null, async () => {
         const created = await writer.createCard(body as NewCard)
         const doc = await project.applyWritten(created)
@@ -298,6 +295,7 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
       if (err instanceof HttpError) return json(res, err.status, { error: err.message })
       if (err instanceof CompromisedError) return json(res, 503, { error: err.message, code: 'compromised' })
       if (err instanceof ScopeError) return json(res, 403, { error: err.message })
+      if (err instanceof ValidationError) return json(res, 422, { diagnostics: err.diagnostics })
       console.error(err)
       json(res, 500, { error: 'internal error' })
     })

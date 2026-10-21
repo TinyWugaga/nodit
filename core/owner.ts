@@ -1,8 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
-import { resolveInScope, resolveReadable } from './scope'
+import { resolveInScope, resolveReadable, ScopeError } from './scope'
 
 /** Every entry point (server, CLI) must lock with exactly these options. */
 export const LOCK_OPTIONS = Object.freeze({ stale: 10_000, update: 2_000, retries: 0, realpath: true })
@@ -31,6 +31,7 @@ export function lockPaths(root: string) {
   return {
     dir,
     lockfilePath: path.join(dir, 'writer.lock'),
+    reclaim: path.join(dir, 'writer.lock.reclaim'),
     owner: path.join(dir, 'owner.json'),
     token: path.join(dir, 'token'),
   }
@@ -104,6 +105,44 @@ export class Owner {
   }
 }
 
+const isStale = (mtimeMs: number) => mtimeMs < Date.now() - LOCK_OPTIONS.stale
+/** a live holder refreshes every `update` ms; a lock this close to stale is not handed to proper-lockfile */
+const NEAR_STALE_MARGIN = LOCK_OPTIONS.update
+
+function busy(): NodeJS.ErrnoException {
+  return Object.assign(new Error('Lock file is already being held'), { code: 'ELOCKED' })
+}
+
+/**
+ * proper-lockfile reclaims a stale lock with stat → rmdir → mkdir, so a process acting on an older
+ * stat can delete the lock another process just created and both end up holding it. We remove a
+ * stale lock ourselves, only while holding the reclaim mutex and only after re-checking it there;
+ * proper-lockfile then never sees a stale lock and the winner is decided by its atomic mkdir.
+ */
+async function reclaimStale(p: ReturnType<typeof lockPaths>) {
+  const current = await stat(p.lockfilePath).catch(() => null)
+  if (!current) return
+  if (!isStale(current.mtimeMs)) {
+    if (isStale(current.mtimeMs + NEAR_STALE_MARGIN)) throw busy()
+    return
+  }
+  try {
+    await mkdir(p.reclaim)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    // left behind by a reclaimer that died; clear it so a later attempt can proceed, but not this one
+    const held = await stat(p.reclaim).catch(() => null)
+    if (held && isStale(held.mtimeMs)) await rmdir(p.reclaim).catch(() => {})
+    throw busy()
+  }
+  try {
+    const again = await stat(p.lockfilePath).catch(() => null)
+    if (again && isStale(again.mtimeMs)) await rm(p.lockfilePath, { recursive: true, force: true })
+  } finally {
+    await rmdir(p.reclaim).catch(() => {})
+  }
+}
+
 export async function acquireOwner(root: string, mode: OwnerMode, sessionId = randomUUID()): Promise<Owner> {
   const p = lockPaths(root)
   // .nodit must be a real directory inside the project, never a symlink to somewhere else
@@ -111,10 +150,16 @@ export async function acquireOwner(root: string, mode: OwnerMode, sessionId = ra
   const createdDir = !(await stat(p.dir).then(() => true, () => false))
   await mkdir(p.dir, { recursive: true })
   await resolveInScope(root, '.nodit', ['.nodit'])
-  for (const name of ['writer.lock', 'owner.json', 'token']) await resolveInScope(root, `.nodit/${name}`, ['.nodit'])
+  // .nodit itself is verified above; its entries come and go with other processes, so a single
+  // lstat each (missing is fine) is the only race-free check left: none may be a symlink
+  for (const file of [p.lockfilePath, p.reclaim, p.owner, p.token]) {
+    const entry = await lstat(file).catch(() => null)
+    if (entry?.isSymbolicLink()) throw new ScopeError(`目標是 symlink，拒絕寫入：.nodit/${path.basename(file)}`)
+  }
   let owner: Owner | undefined
   let release: () => Promise<void>
   try {
+    await reclaimStale(p)
     release = await lockfile.lock(p.dir, {
       ...LOCK_OPTIONS,
       lockfilePath: p.lockfilePath,

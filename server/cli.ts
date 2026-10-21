@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
-import { loadConfig, type NoditConfig } from '../core/config'
+import { CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { ImportError, runImport, type ImportConflict, type ImportReport } from '../core/import'
 import { applyInit, initPaths, planInit, publicPlan, scopedRead, type InitResult } from '../core/init'
 import { CARD_KINDS, LINK_KINDS, type CardKind, type LinkKind } from '../core/domain'
@@ -124,7 +124,8 @@ async function withProject<T>(
       const owner = await acquireOwner(root, 'cli')
       try {
         const loaded = await loadConfig(root)
-        return await offline(new Writer(root, loaded.config, owner), loaded.config, loaded.exists)
+        const problems = loaded.diagnostics.filter((d) => d.code === CONFIG_INVALID)
+        return await offline(new Writer(root, loaded.config, owner, () => problems), loaded.config, loaded.exists)
       } finally {
         await owner.release()
       }
@@ -283,6 +284,10 @@ main().catch((err) => {
   if (err instanceof CliError) {
     console.error(err.message)
     process.exit(err.code)
+  }
+  if (err instanceof ValidationError) {
+    console.error(err.diagnostics.map((d) => `✗ ${d.message}`).join('\n'))
+    process.exit(1)
   }
   console.error(err)
   process.exit(1)

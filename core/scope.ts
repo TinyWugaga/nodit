@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs'
 import { lstat, realpath } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -20,9 +21,10 @@ export async function resolveInScope(root: string, rel: string, allowed: string[
   const abs = path.join(realRoot, ...norm.split('/'))
 
   let probe = abs
+  let found: Stats
   for (;;) {
     try {
-      await lstat(probe)
+      found = await lstat(probe)
       break
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
@@ -31,7 +33,7 @@ export async function resolveInScope(root: string, rel: string, allowed: string[
       probe = parent
     }
   }
-  if (probe === abs && (await lstat(abs)).isSymbolicLink()) throw new ScopeError(`目標是 symlink，拒絕寫入：${rel}`)
+  if (probe === abs && found.isSymbolicLink()) throw new ScopeError(`目標是 symlink，拒絕寫入：${rel}`)
   let realProbe: string
   try {
     realProbe = await realpath(probe)

@@ -9,7 +9,8 @@ import { sha1, toClientDoc, type ParsedDoc } from '../core/parse'
 import type { ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatus } from '../core/protocol'
 import { crossValidate, readLayout, scanDocs, TMP_MARK, type LayoutFile } from '../core/scan'
 import { resolveReadable } from '../core/scope'
-import { BLOCK_START_RE, skillPath } from '../core/templates'
+import { findBlock } from '../core/init'
+import { skillPath } from '../core/templates'
 
 export type ChangeEvent = Envelope<{ changed: string[] }>
 
@@ -49,6 +50,11 @@ export class ProjectService extends EventEmitter {
 
   envelope<T extends object>(payload: T): Envelope<T> {
     return { projectId: this.projectId, sessionId: this.sessionId, rev: this.rev, ...payload }
+  }
+
+  /** Writes are refused until some config was accepted; a later bad file keeps the accepted one. */
+  configProblems(): Diagnostic[] {
+    return this.configAccepted ? [] : this.configDiagnostics.filter((d) => d.code === CONFIG_INVALID)
   }
 
   getDoc(docKey: string) {
@@ -190,11 +196,13 @@ export class ProjectService extends EventEmitter {
       components[kind] = dir?.isDirectory() ? 'ok' : 'missing'
     }
     components.architecture = architectureRevision === 'absent' ? 'missing' : 'ok'
-    // installed = recorded by init and still present on disk (block markers for the shared files)
+    // installed = recorded by init and still present on disk; shared files need exactly one complete block,
+    // the same rule init uses to decide conflicts
     for (const file of AI_PATHS) {
       const key = file.endsWith('.md') && !file.includes('/') ? `${file}#nodit` : file
       const text = config.managed[key] ? await resolveReadable(this.root, file).then((abs) => readFile(abs, 'utf8')).catch(() => null) : null
-      components[key] = text !== null && (key === file || new RegExp(BLOCK_START_RE.source).test(text)) ? 'ok' : 'missing'
+      const intact = text !== null && (key === file || typeof findBlock(text) === 'object')
+      components[key] = intact ? 'ok' : text === null ? 'missing' : 'invalid'
     }
     return { initialized: exists && !invalid, components }
   }

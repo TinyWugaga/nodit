@@ -54,7 +54,8 @@ export function publicPlan(plan: InitPlan) {
   }
 }
 
-function findBlock(text: string): { start: number; end: number } | 'none' | 'malformed' {
+/** The single, complete Nodit block in a shared file, or why there is none. */
+export function findBlock(text: string): { start: number; end: number } | 'none' | 'malformed' {
   const starts = [...text.matchAll(BLOCK_START_RE)]
   const ends = text.split(BLOCK_END).length - 1
   if (!starts.length && !ends) return 'none'

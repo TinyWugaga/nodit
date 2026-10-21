@@ -317,6 +317,8 @@ export const useProject = create<State>()(
         if (result.ok) {
           for (const [code, p] of Object.entries(pending)) if (pendingLayout[code] === p) delete pendingLayout[code]
           if (fresh(result.meta)) set({ layout: data, layoutRevision: result.revision })
+          // nodes drawn from the cleared overlay now fall back to the canonical layout
+          rebuild()
           return
         }
         if (result.reason === 'conflict' && 'layout' in result && retry) {

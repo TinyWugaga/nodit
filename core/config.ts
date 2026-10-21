@@ -53,8 +53,10 @@ export async function loadConfig(root: string): Promise<{ config: NoditConfig; e
   try {
     text = await readFile(await resolveReadable(root, CONFIG_FILE), 'utf8')
   } catch (err) {
-    if (!(err instanceof ScopeError)) return { config: base, exists: false, diagnostics }
-    diagnostics.push({ level: 'error', code: CONFIG_INVALID, message: `${CONFIG_FILE}：${err.message}` })
+    // only a missing file means "not initialized"; unreadable is unusable, never "use defaults"
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { config: base, exists: false, diagnostics }
+    const reason = err instanceof ScopeError ? err.message : `無法讀取：${(err as Error).message}`
+    diagnostics.push({ level: 'error', code: CONFIG_INVALID, message: `${CONFIG_FILE}：${reason}` })
     return { config: base, exists: true, diagnostics }
   }
 

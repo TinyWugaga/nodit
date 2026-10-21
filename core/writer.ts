@@ -105,10 +105,16 @@ export class Writer {
 
   private getConfig: () => NoditConfig
 
+  /**
+   * `configProblems` returns the reasons the config must not be written against (an unreadable
+   * or invalid nodit.config.json that was never accepted). Every queued write checks it, so the
+   * server, offline CLI, init and import share one gate.
+   */
   constructor(
     private root: string,
     config: NoditConfig | (() => NoditConfig),
     private owner: Owner,
+    private configProblems: () => Diagnostic[] = () => [],
   ) {
     this.getConfig = typeof config === 'function' ? config : () => config
   }
@@ -153,6 +159,8 @@ export class Writer {
   private enqueue<T>(job: () => Promise<T>): Promise<T> {
     const run = this.chain.then(() => {
       this.owner.assertWritable()
+      const problems = this.configProblems()
+      if (problems.length) throw new ValidationError(problems)
       return job()
     })
     this.chain = run.catch(() => {})

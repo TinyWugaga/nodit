@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { cp, mkdir, mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -90,16 +90,36 @@ describe('nodit new', () => {
 
 describe('lock recovery', () => {
   it('only one of two processes reclaims a genuinely stale lock', async () => {
-    const p = lockPaths(root)
-    await mkdir(p.lockfilePath, { recursive: true })
-    const old = new Date(Date.now() - 60_000)
-    await utimes(p.lockfilePath, old, old)
-    // both processes must be running before startAt even when tsx starts slowly under load
-    const startAt = String(Date.now() + 6000)
     const script = path.join(REPO, 'tests/fixtures/acquire.ts')
-    const outs = await Promise.all([1, 2].map(() => run(TSX, [script, root, startAt], { cwd: REPO }).then((r) => r.stdout.trim())))
-    expect(outs.sort(), outs.join(' / ')).toEqual(['busy', 'ok'])
-  }, 30_000)
+    const child = () => {
+      const c = spawn(TSX, [script, root], { cwd: REPO })
+      const lines: string[] = []
+      const waiters: (() => void)[] = []
+      c.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+        lines.push(...chunk.split('\n').filter(Boolean))
+        waiters.splice(0).forEach((w) => w())
+      })
+      const line = async (n: number) => {
+        while (lines.length < n) await new Promise<void>((r) => waiters.push(r))
+        return lines[n - 1]
+      }
+      return { c, line, done: new Promise((r) => c.on('exit', r)) }
+    }
+    // both processes are running before "go", and both report before either releases
+    for (let i = 0; i < 5; i++) {
+      const p = lockPaths(root)
+      await mkdir(p.lockfilePath, { recursive: true })
+      const old = new Date(Date.now() - 60_000)
+      await utimes(p.lockfilePath, old, old)
+      const xs = [child(), child()]
+      await Promise.all(xs.map((x) => x.line(1)))
+      xs.forEach((x) => x.c.stdin.write('go\n'))
+      const outs = await Promise.all(xs.map((x) => x.line(2)))
+      xs.forEach((x) => x.c.stdin.write('release\n'))
+      await Promise.all(xs.map((x) => x.done))
+      expect(outs.sort(), outs.join(' / ')).toEqual(['busy', 'ok'])
+    }
+  }, 60_000)
 })
 
 describe('nodit init', () => {

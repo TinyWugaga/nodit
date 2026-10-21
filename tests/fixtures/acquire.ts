@@ -1,13 +1,18 @@
+import { createInterface } from 'node:readline'
 import { acquireOwner, LockBusyError } from '../../core/owner'
 
-const [root, startAt] = process.argv.slice(2)
-const wait = Number(startAt) - Date.now()
-if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+/** Handshake over stdin: report ready, acquire on "go", hold until "release" so overlaps are certain. */
+const root = process.argv[2]
+const rl = createInterface({ input: process.stdin })
+const lines = rl[Symbol.asyncIterator]()
+console.log('ready')
+await lines.next()
 try {
   const owner = await acquireOwner(root, 'cli')
   console.log('ok')
-  await new Promise((r) => setTimeout(r, 4000))
+  await lines.next()
   await owner.release()
 } catch (err) {
   console.log(err instanceof LockBusyError ? 'busy' : `error ${(err as Error).message}`)
 }
+rl.close()
