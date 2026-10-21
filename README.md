@@ -43,6 +43,7 @@ nodit
 | `nodit [dir] [--port 4319]` | 開啟專案，預設是目前目錄 |
 | `nodit init [dir] [--no-ai] [--yes] [--dry-run]` | 初始化：`nodit.config.json`、卡片資料夾、`docs/ARCHITECTURE.md`、`.gitignore`，以及 AI 指令檔與 skills（`--no-ai` 時略過） |
 | `nodit new <adr\|milestone\|task> "<標題>" [選項]` | 新建卡片並配發不重複的編號 |
+| `nodit import <file.json> [dir]` | 匯入舊版 localStorage 匯出的 JSON |
 
 `nodit new` 的選項：
 
@@ -52,7 +53,22 @@ nodit
 - `--milestone <MS-ID>`：Task 所屬的 milestone。
 - `--json`：以 JSON 輸出結果。
 
-`nodit` server 運作中時，`new` 和 `init` 會經由它的 API 寫入；沒有 server 時，CLI 會自己取得寫入鎖再寫入。
+`nodit` server 運作中時，`new`、`init` 和 `import` 會經由它的 API 寫入；沒有 server 時，CLI 會自己取得寫入鎖再寫入。
+
+### 匯入舊版資料
+
+舊版 Nodit 把資料存在瀏覽器 localStorage 的 `nodit:project`。在舊版頁面用 Header 的封存按鈕下載 JSON 後，用下列任一種方式匯入：
+
+- CLI：`nodit import nodit-legacy-localstorage.json`。
+- UI：按 Header 匯出按鈕旁的上傳按鈕，選擇同一個檔案。
+
+規則：
+
+- 首次匯入只能在已經 init、而且還沒有任何卡片的專案進行。
+- 寫入卡片前，會先把「舊 UUID → 新 ID」對照表和每份預定輸出存到 `.nodit/import-<sha1>.json`。
+- 舊卡片代號合法而且不重複時會沿用原代號，否則改配下一個編號。關聯依新格式的方向寫回來源端；不合規則的關聯會改存為 `relates`。座標會併入 `.nodit/layout.json`。
+- 中斷後用同一個檔案重跑即可續跑。已經寫好的卡片會直接沿用，不會重新配發 ID。
+- 如果中斷後有人修改、刪除已匯入的卡片，或預定 ID 被別的卡片佔用，續跑會列出衝突並停止，不覆寫任何檔案。這時要先把檔案改回對照表裡的預定內容，或改成手動完成剩下的部分。
 
 ## 檔案格式
 
@@ -99,7 +115,7 @@ depends: [T-011]
 - 外部編輯器不參與 Nodit 的寫入鎖。和 UI 同時存同一份檔案時，revision 檢查只能擋下多數情況。
 - server 重啟後要重新整理頁面才能寫入；還沒送出的草稿會遺失。
 - 修改標題不會改檔名。
-- 舊版存在 localStorage 的資料不會自動匯入。
+- 舊版存在 localStorage 的資料不會自動匯入，要先匯出 JSON 再用 `nodit import` 匯入。
 
 ## 開發
 

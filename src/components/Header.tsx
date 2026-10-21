@@ -1,4 +1,4 @@
-import { Archive, Download, Search, X } from 'lucide-react'
+import { Archive, Download, Search, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { LEGACY_STORAGE_KEY, useProject } from '../store'
@@ -20,10 +20,12 @@ function readLegacy() {
 }
 
 export function Header() {
-  const { projectName, query, setQuery, view, setView } = useProject(
-    useShallow((s) => ({ projectName: s.projectName, query: s.query, setQuery: s.setQuery, view: s.view, setView: s.setView })),
+  const { projectName, query, setQuery, view, setView, importLegacy } = useProject(
+    useShallow((s) => ({ projectName: s.projectName, query: s.query, setQuery: s.setQuery, view: s.view, setView: s.setView, importLegacy: s.importLegacy })),
   )
   const searchRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
   const [legacy] = useState(readLegacy)
 
   useEffect(() => {
@@ -41,6 +43,17 @@ export function Header() {
   const exportSnapshot = () => {
     const { meta, docs, layout } = useProject.getState()
     download(`${projectName || 'project'}.nodit-snapshot.json`, JSON.stringify({ meta, docs, layout }, null, 2))
+  }
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return
+    setImporting(true)
+    try {
+      await importLegacy(await file.text())
+    } finally {
+      setImporting(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   return (
@@ -94,6 +107,16 @@ export function Header() {
           <button type="button" className="icon-btn" title="匯出目前的 snapshot（JSON）" onClick={exportSnapshot}>
             <Download size={16} />
           </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title="匯入舊版 localStorage 匯出的 JSON（只能匯入沒有卡片的專案；中斷後選同一個檔案即可續跑）"
+            disabled={importing}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload size={16} />
+          </button>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void importFile(e.target.files?.[0])} />
           {legacy && (
             <button
               type="button"

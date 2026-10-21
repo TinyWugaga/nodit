@@ -1,5 +1,5 @@
 import type { Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
-import type { CreateResult, DeleteResult, Failure, InitPlanView, InitResultView, LayoutResult, LinkChange, NewCardInput, ProjectClient, SubscribeHandlers } from './client'
+import type { CreateResult, DeleteResult, Failure, ImportResult, InitPlanView, InitResultView, LayoutResult, LinkChange, NewCardInput, ProjectClient, SubscribeHandlers } from './client'
 
 type Raw = { status: number; body: any; error?: string }
 
@@ -111,6 +111,15 @@ export class HttpProjectClient implements ProjectClient {
     const r = await this.send('POST', '/api/init/apply', { planId, itemIds })
     if (r.status === 200) return { ok: true, results: r.body.results }
     if (r.status === 410) return { ok: false, reason: 'conflict', message: '計畫已過期，請重新產生' }
+    return this.failure(r)
+  }
+
+  async importLegacy(text: string): Promise<ImportResult> {
+    const r = await this.send('POST', '/api/import', { text })
+    if (r.status === 200) return { ok: true, report: r.body.report }
+    if (r.status === 409 || r.status === 422) {
+      return { ok: false, reason: r.body.code === 'conflict' ? 'conflict' : 'invalid', message: r.body.error ?? `HTTP ${r.status}`, conflicts: r.body.conflicts }
+    }
     return this.failure(r)
   }
 

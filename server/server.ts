@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import path from 'node:path'
 import { acquireOwner, CompromisedError, type Owner } from '../core/owner'
 import { CARD_KINDS } from '../core/domain'
+import { ImportError, runImport } from '../core/import'
 import { applyInit, initPaths, planInit, publicPlan, scopedRead, type InitPlan } from '../core/init'
 import { revisionOf, toClientDoc, type ParsedDoc } from '../core/parse'
 import type { FieldPatch } from '../core/protocol'
@@ -28,6 +29,7 @@ export type RunningServer = {
 }
 
 const MAX_BODY = 1024 * 1024
+const MAX_IMPORT_BODY = 16 * 1024 * 1024
 const PLAN_TTL = 10 * 60_000
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -53,12 +55,12 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+async function readBody(req: IncomingMessage, limit = MAX_BODY): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
     size += (chunk as Buffer).length
-    if (size > MAX_BODY) throw new HttpError(413, 'request body too large')
+    if (size > limit) throw new HttpError(413, 'request body too large')
     chunks.push(chunk as Buffer)
   }
   try {
@@ -153,6 +155,21 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
       } catch (err) {
         if (err instanceof ValidationError) return json(res, 422, project.envelope({ diagnostics: err.diagnostics }))
         throw err
+      }
+    }
+
+    if (method === 'POST' && p === '/api/import') {
+      const body = (await readBody(req, MAX_IMPORT_BODY)) as { text?: unknown }
+      if (typeof body.text !== 'string') throw new HttpError(400, 'text is required')
+      try {
+        const report = await runImport(root, writer, project.config, project.configExists, body.text)
+        return json(res, 200, project.envelope({ report }))
+      } catch (err) {
+        if (!(err instanceof ImportError)) throw err
+        const status = err.code === 'invalid-input' || err.code === 'not-initialized' ? 422 : 409
+        return json(res, status, project.envelope({ error: err.message, code: err.code, conflicts: err.conflicts }))
+      } finally {
+        await project.rescan()
       }
     }
 

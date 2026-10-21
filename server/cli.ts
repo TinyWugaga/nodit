@@ -1,8 +1,10 @@
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
 import { loadConfig, type NoditConfig } from '../core/config'
+import { ImportError, runImport, type ImportConflict, type ImportReport } from '../core/import'
 import { applyInit, initPaths, planInit, publicPlan, scopedRead, type InitResult } from '../core/init'
 import { CARD_KINDS, LINK_KINDS, type CardKind, type LinkKind } from '../core/domain'
 import { acquireOwner, LockBusyError, readToken, type OwnerInfo } from '../core/owner'
@@ -20,7 +22,8 @@ nodit new <adr|milestone|task> "<title>" [options]
     --depends <ID>           可重複
     --supersedes <ADR-ID>    可重複（新 ADR 取代舊 ADR）
     --relates <ID>           可重複
-    --json                   以 JSON 輸出結果`
+    --json                   以 JSON 輸出結果
+nodit import <file.json> [dir]       匯入舊版 localStorage 匯出（nodit:project）；中斷後用同一個檔案重跑即可續跑`
 
 class CliError extends Error {
   constructor(
@@ -230,11 +233,45 @@ async function cmdNew(argv: string[]) {
   }
 }
 
+function importFailure(message: string, conflicts: ImportConflict[] = []) {
+  return new CliError([message, ...conflicts.map((c) => `  ✗ ${c.id ? c.id + '  ' : ''}${c.path}  — ${c.reason}`)].join('\n'))
+}
+
+async function cmdImport(argv: string[]) {
+  const [file, dir = '.', ...extra] = argv
+  if (!file || file.startsWith('-') || extra.length) throw new CliError(`用法：nodit import <file.json> [dir]\n\n${HELP}`)
+  const root = path.resolve(dir)
+  const text = await readFile(path.resolve(file), 'utf8')
+  let report: ImportReport
+  try {
+    report = await withProject(
+      root,
+      (writer, config, configExists) => runImport(root, writer, config, configExists, text),
+      async (api) => {
+        const r = await api('POST', '/api/import', { text })
+        if (r.status === 200) return r.body.report
+        throw importFailure(r.body.error ?? `server 回應 ${r.status}`, r.body.conflicts)
+      },
+    )
+  } catch (err) {
+    if (err instanceof ImportError) throw importFailure(err.message, err.conflicts)
+    throw err
+  }
+  if (report.status === 'already-complete') {
+    console.log(`這份檔案已經匯入完成（${report.total} 張卡片）：${report.jobPath}`)
+    return
+  }
+  console.log(`${report.resumed ? '續跑完成' : '匯入完成'}：新寫入 ${report.created.length}、沿用既有 ${report.adopted.length}，共 ${report.total} 張卡片`)
+  console.log(`對照表：${report.jobPath}`)
+  for (const w of report.warnings) console.log(`  ! ${w}`)
+}
+
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)
   if (cmd === '--help' || cmd === '-h' || cmd === 'help') return console.log(HELP)
   if (cmd === 'new') return cmdNew(rest)
   if (cmd === 'init') return cmdInit(rest)
+  if (cmd === 'import') return cmdImport(rest)
   return serve(process.argv.slice(2))
 }
 

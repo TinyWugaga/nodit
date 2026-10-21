@@ -1,4 +1,5 @@
 import type { CardKind, LinkKind } from '../../core/domain'
+import type { ImportConflict, ImportReport } from '../../core/import'
 import type { ClientDoc, Diagnostic, Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
 
 export type Meta = { projectId: string; sessionId: string; rev: number }
@@ -44,8 +45,11 @@ export interface ProjectClient {
   getArchitecture(): Promise<{ path: string; revision: string; markdown: string | null }>
   getInitPlan(ai: boolean): Promise<InitPlanView>
   applyInit(planId: string, itemIds: string[]): Promise<{ ok: true; results: InitResultView[] } | Failure>
+  importLegacy(text: string): Promise<ImportResult>
   subscribe(handlers: SubscribeHandlers): () => void
 }
+
+export type ImportResult = { ok: true; report: ImportReport } | (Failure & { conflicts?: ImportConflict[] })
 
 export type InitItemView = {
   itemId: string

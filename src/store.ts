@@ -75,6 +75,8 @@ type State = {
   initOpen: boolean
   setInitOpen: (open: boolean) => void
 
+  importLegacy: (text: string) => Promise<void>
+
   view: 'graph' | 'architecture'
   setView: (view: 'graph' | 'architecture') => void
   architecture: { path: string; revision: string }
@@ -506,6 +508,23 @@ export const useProject = create<State>()(
         setInitOpen: (initOpen) => {
           set({ initOpen })
           if (!initOpen) void sync.fetch()
+        },
+
+        importLegacy: async (text) => {
+          const result = await client.importLegacy(text)
+          if (result.ok) {
+            const r = result.report
+            toast(
+              r.status === 'already-complete'
+                ? `這份檔案已經匯入完成（${r.total} 張卡片）`
+                : `已匯入 ${r.created.length + r.adopted.length} / ${r.total} 張卡片${r.warnings.length ? `，${r.warnings.length} 則提醒見 ${r.jobPath}` : ''}`,
+              'info',
+            )
+            void sync.fetch()
+            return
+          }
+          const detail = result.conflicts?.length ? `：${result.conflicts.map((c) => c.id || c.path).join('、')}` : ''
+          toast(`匯入失敗，${result.message}${detail}`)
         },
       }
     },

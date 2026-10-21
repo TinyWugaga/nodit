@@ -62,5 +62,10 @@ Nodit 原本把資料存在瀏覽器 localStorage，跟實際專案脫節。要�
 ## 影響
 
 - 開發時需要同時跑 CLI server（`npm run dev:server`）與 Vite（`npm run dev`），由 Vite proxy 轉送 `/api`。
-- localStorage 的舊資料不會自動遷移。舊版仍可以匯出 JSON；JSON 匯入延後到下一階段，續跑契約記在實作計畫裡。
+- localStorage 的舊資料不會自動遷移，要先從舊版匯出 JSON，再用 `nodit import` 或 UI 匯入（`core/import.ts`）。
+  - 首次匯入只接受已 init、沒有卡片的專案。
+  - 完整的對照表與預定輸出會先寫進 `.nodit/import-<sha1>.json`，之後才寫卡片。
+  - 續跑必須是同一個 projectId 和同一個輸入 fingerprint。內容和計畫相同的檔案視為已完成；其他不符的情況（被修改、被刪除、ID 被佔用）一律回報衝突並停止。
+  - 整個 job 在 writer 佇列內以單一 `exclusive` 執行。
+  - 舊代號合法而且不重複時沿用，否則改配下一個編號。
 - `nodit` 沒有發布到 npm，要用 `npm link` 安裝。AI 指令檔因此要求先確認 `nodit` 指令存在，並禁止使用 `npx nodit`。
