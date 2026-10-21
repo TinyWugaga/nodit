@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, rm, stat, utimes } from 'node:fs/promises'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -89,7 +89,7 @@ describe('nodit new', () => {
 })
 
 describe('lock recovery', () => {
-  it('only one of two processes reclaims a genuinely stale lock', async () => {
+  it('two processes racing for a stale lock both report busy and leave it in place', async () => {
     const script = path.join(REPO, 'tests/fixtures/acquire.ts')
     const child = () => {
       const c = spawn(TSX, [script, root], { cwd: REPO })
@@ -119,7 +119,9 @@ describe('lock recovery', () => {
       const outs = await Promise.all(xs.map((x) => x.line(2)))
       xs.forEach((x) => x.c.stdin.write('release\n'))
       await Promise.all(xs.map((x) => x.done))
-      expect(outs.sort(), outs.join(' / ')).toEqual(['busy', 'ok'])
+      expect(outs, outs.join(' / ')).toEqual(['busy', 'busy'])
+      expect((await stat(p.lockfilePath)).mtimeMs).toBe(old.getTime())
+      await rm(p.lockfilePath, { recursive: true })
     }
   }, 60_000)
 })

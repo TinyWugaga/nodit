@@ -25,7 +25,8 @@ Nodit 原本把資料存在瀏覽器 localStorage，跟實際專案脫節。要�
 - **寫入協定**：
   - 每份文件的 revision 是原始位元組的 sha1。更新、刪除、連線修改都帶 `baseRevision`，不符就回 409，不寫入。
   - 同一時間只有一個 writer。lock 用 `proper-lockfile`，所有入口共用 `core/owner.ts` 的 `LOCK_OPTIONS`。
-  - 過期 lock 不交給 `proper-lockfile` 回收（它的 stat → rmdir → mkdir 會讓兩個程序同時取得）。Nodit 先取得 `.nodit/writer.lock.reclaim`（以 `link` 原子建立，記錄 pid、主機、token），持有期間重查仍過期才刪除。這個回收標記只由持有者自己移除，不論逾時或持有者已結束都不自動接管；回收途中崩潰留下的標記會讓寫入回報 busy，訊息指出檔案位置，需人工確認後刪除（2026-10-21 起）。
+  - 過期 lock 不自動回收（2026-10-21 起）。自動回收是「確認過期 → 刪除 → 重建」，與一般取得、正常釋放、其他回收者交錯時，會讓兩個程序同時可寫，逐條補上檢查無法封閉。遇到過期 lock 一律回報 busy，訊息附人工復原步驟：停止該專案所有 Nodit 程序、確認復原期間不會再啟動，再手動刪除 `.nodit/writer.lock`、`owner.json`、`token`。
+  - `proper-lockfile` 自身仍會回收過期 lock，且 `stale` 最小為 2 秒，無法以參數關閉；`core/owner.ts` 傳入只允許刪除「本次 mkdir 建立之 lock」的 `fs`，讓它的回收在刪除那一步失敗。
   - 收到 `onCompromised` 時停止所有寫入，並透過 SSE 通知 UI。
   - CLI 遇到 server 持有 lock 時，先打 health 並核對 owner 與 session，再改走 API；health 沒有回應就失敗，不接管 lock。
   - 更新時先寫同目錄的暫存檔再 rename；新建時用 `wx`。新卡片的 ID 在寫入佇列內配發：重新掃描磁碟，取最大值 + 1。
@@ -56,6 +57,8 @@ Nodit 原本把資料存在瀏覽器 localStorage，跟實際專案脫節。要�
 
 - 外部編輯器不配合鎖定時，revision 檢查擋不住同時寫入，沒有完全原子的 compare-and-swap。
 - `proper-lockfile` 偵測不到兩種情況：有人手動刪除 lock，以及不同 process 使用不同的 stale / update 設定。
+- 程序非正常結束（崩潰、`kill -9`、斷電）後，寫入鎖不會自動回收，需要依錯誤訊息人工復原。
+- 持有者暫停超過 stale 門檻後恢復，在 `onCompromised` 觸發前仍可能寫入；偵測時間取決於更新週期與程序排程，沒有硬上限。
 - 外部 AI 直接手寫的檔案，只能事後靠重複 ID 診斷發現撞號。
 - 修改 `title` 不會改檔名。檔案是用 ID 識別的，所以檔名中的 slug 可能和標題不一致。
 - server 重啟後 token 會改變，頁面需要重新整理才能寫入。尚未送出的草稿只存在記憶體裡，重新整理就會遺失。

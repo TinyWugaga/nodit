@@ -1,7 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
-import { link, lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises'
-import { hostname } from 'node:os'
+import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
 import { resolveInScope, resolveReadable, ScopeError } from './scope'
@@ -36,7 +35,6 @@ export function lockPaths(root: string) {
   return {
     dir,
     lockfilePath: path.join(dir, 'writer.lock'),
-    reclaim: path.join(dir, 'writer.lock.reclaim'),
     owner: path.join(dir, 'owner.json'),
     token: path.join(dir, 'token'),
   }
@@ -110,18 +108,15 @@ export class Owner {
   }
 }
 
-const isStale = (mtimeMs: number) => mtimeMs < Date.now() - LOCK_OPTIONS.stale
-/** a live holder refreshes every `update` ms; a lock this close to stale is not handed to proper-lockfile */
-const NEAR_STALE_MARGIN = LOCK_OPTIONS.update
-
 function busy(): NodeJS.ErrnoException {
   return Object.assign(new Error('Lock file is already being held'), { code: 'ELOCKED' })
 }
 
 /**
- * fs for proper-lockfile that may only remove the lock this acquisition created itself. Its own
- * stale reclaim (stat → rmdir → mkdir) then fails with ELOCKED instead of racing, even if the lock
- * crosses the stale threshold after `reclaimStale` looked at it. Release and cleanup still work.
+ * fs for proper-lockfile that may only remove the lock this acquisition created itself.
+ * proper-lockfile always reclaims a stale lock on its own (stat → rmdir → mkdir; `stale` cannot go
+ * below 2s), and that reclaim races with other acquirers, releases and reclaimers. With this fs the
+ * rmdir fails with ELOCKED, so a stale lock is never removed automatically. Release still works.
  */
 export function noReclaimFs(lockfilePath: string): typeof fs {
   let created = false
@@ -141,85 +136,24 @@ export function noReclaimFs(lockfilePath: string): typeof fs {
   return guarded
 }
 
-type ReclaimHolder = { pid: number; host: string; token: string }
-
-function processAlive(pid: number) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM'
-  }
-}
-
-async function readHolder(file: string): Promise<ReclaimHolder | 'unreadable' | null> {
-  try {
-    const h = JSON.parse(await readFile(file, 'utf8'))
-    return Number.isInteger(h?.pid) && typeof h.host === 'string' && typeof h.token === 'string' ? h : 'unreadable'
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'ENOENT' ? null : 'unreadable'
-  }
-}
-
 /**
- * Reclaim mutex as a file holding { pid, host, token }, created atomically with link(). It is never
- * removed by anyone but its holder: not by age, and not when the holder looks dead, because
- * "checked it is dead" and "removed it" cannot be one atomic step and a paused process can stretch
- * that gap until it deletes a successor's mutex. A mutex left by a crashed reclaimer therefore
- * blocks writes until a person removes it; the error says which file and why.
+ * A busy lock that has not been refreshed within `stale` is most likely left by a process that
+ * exited abnormally. Nodit never removes it: deleting it safely needs every Nodit process stopped,
+ * which only a person can ensure. The message says what to do.
  */
-async function takeReclaimMutex(p: ReturnType<typeof lockPaths>): Promise<() => Promise<void>> {
-  const me: ReclaimHolder = { pid: process.pid, host: hostname(), token: randomUUID() }
-  const tmp = `${p.reclaim}.${me.token}.tmp`
-  await writeFile(tmp, JSON.stringify(me), { flag: 'wx' })
-  try {
-    await link(tmp, p.reclaim)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
-    throw new LockBusyError(null, await describeReclaimer(p.reclaim))
-  } finally {
-    await unlink(tmp).catch(() => {})
-  }
-  return async () => {
-    const held = await readHolder(p.reclaim)
-    if (held && held !== 'unreadable' && held.token === me.token) await unlink(p.reclaim).catch(() => {})
-  }
-}
-
-async function describeReclaimer(file: string) {
-  const manual = `確認沒有任何 Nodit 程序在執行後，手動刪除 ${file} 再重試`
-  const entry = await lstat(file).catch(() => null)
-  if (!entry) return '另一個 Nodit 程序剛完成過期寫入鎖的回收，請重試'
-  if (entry.isDirectory()) return `過期寫入鎖的回收標記是舊版 Nodit 留下的。${manual}`
-  const held = await readHolder(file)
-  if (held === null) return '另一個 Nodit 程序剛完成過期寫入鎖的回收，請重試'
-  if (held === 'unreadable') return `過期寫入鎖的回收標記內容無法辨識。${manual}`
-  if (held.host !== hostname()) return `過期寫入鎖正由另一台主機（${held.host}，pid ${held.pid}）回收中。若該程序已不存在，${manual}`
-  if (processAlive(held.pid)) return `另一個 Nodit 程序（pid ${held.pid}）正在回收過期的寫入鎖`
-  return `回收過期寫入鎖的程序（pid ${held.pid}）已中止，沒有清除回收標記。${manual}`
-}
-
-/**
- * proper-lockfile reclaims a stale lock with stat → rmdir → mkdir, so a process acting on an older
- * stat can delete the lock another process just created and both end up holding it. We remove a
- * stale lock ourselves, only while holding the reclaim mutex (one holder at a time, see above) and
- * after re-checking it there; proper-lockfile then never sees a stale lock and the winner is decided
- * by its atomic mkdir.
- */
-async function reclaimStale(p: ReturnType<typeof lockPaths>) {
-  const current = await stat(p.lockfilePath).catch(() => null)
-  if (!current) return
-  if (!isStale(current.mtimeMs)) {
-    if (isStale(current.mtimeMs - NEAR_STALE_MARGIN)) throw busy()
-    return
-  }
-  const release = await takeReclaimMutex(p)
-  try {
-    const again = await stat(p.lockfilePath).catch(() => null)
-    if (again && isStale(again.mtimeMs)) await rmdir(p.lockfilePath).catch(() => {})
-  } finally {
-    await release()
-  }
+async function busyError(root: string, p: ReturnType<typeof lockPaths>) {
+  const owner = await readOwner(root)
+  const lock = await stat(p.lockfilePath).catch(() => null)
+  if (!lock || lock.mtimeMs >= Date.now() - LOCK_OPTIONS.stale) return new LockBusyError(owner)
+  const who = owner ? `最後的持有者是 Nodit ${owner.mode}（pid ${owner.pid}）` : '找不到持有者資訊'
+  return new LockBusyError(
+    owner,
+    [
+      `寫入鎖 ${p.lockfilePath} 已超過 ${LOCK_OPTIONS.stale / 1000} 秒沒有更新，${who}。Nodit 不會自動回收過期的寫入鎖。`,
+      '復原方式：停止這個專案的所有 Nodit 程序（server、CLI，以及會呼叫 nodit 的 AI 工具），確認復原完成前不會再啟動，',
+      `再手動刪除 .nodit/writer.lock、.nodit/owner.json 與 .nodit/token 後重試。`,
+    ].join('\n'),
+  )
 }
 
 export async function acquireOwner(root: string, mode: OwnerMode, sessionId = randomUUID()): Promise<Owner> {
@@ -231,14 +165,13 @@ export async function acquireOwner(root: string, mode: OwnerMode, sessionId = ra
   await resolveInScope(root, '.nodit', ['.nodit'])
   // .nodit itself is verified above; its entries come and go with other processes, so a single
   // lstat each (missing is fine) is the only race-free check left: none may be a symlink
-  for (const file of [p.lockfilePath, p.reclaim, p.owner, p.token]) {
+  for (const file of [p.lockfilePath, p.owner, p.token]) {
     const entry = await lstat(file).catch(() => null)
     if (entry?.isSymbolicLink()) throw new ScopeError(`目標是 symlink，拒絕寫入：.nodit/${path.basename(file)}`)
   }
   let owner: Owner | undefined
   let release: () => Promise<void>
   try {
-    await reclaimStale(p)
     release = await lockfile.lock(p.dir, {
       ...LOCK_OPTIONS,
       lockfilePath: p.lockfilePath,
@@ -246,7 +179,7 @@ export async function acquireOwner(root: string, mode: OwnerMode, sessionId = ra
       onCompromised: (err) => owner?.markCompromised(err),
     })
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ELOCKED') throw new LockBusyError(await readOwner(root))
+    if ((err as NodeJS.ErrnoException).code === 'ELOCKED') throw await busyError(root, p)
     throw err
   }
   const info: OwnerInfo = { ownerId: randomUUID(), mode, pid: process.pid, sessionId, startedAt: new Date().toISOString() }

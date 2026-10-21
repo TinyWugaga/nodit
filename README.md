@@ -116,6 +116,7 @@ depends: [T-011]
 - server 重啟後要重新整理頁面才能寫入；還沒送出的草稿會遺失。
 - 修改標題不會改檔名。
 - 舊版存在 localStorage 的資料不會自動匯入，要先匯出 JSON 再用 `nodit import` 匯入。
+- Nodit 非正常結束（崩潰、`kill -9`、斷電）後，寫入鎖不會自動回收，之後的寫入會回報鎖已過期。復原方式：停止這個專案的所有 Nodit 程序（server、CLI，以及會呼叫 `nodit` 的 AI 工具），確認復原完成前不會再啟動，再手動刪除 `.nodit/writer.lock`、`.nodit/owner.json`、`.nodit/token`。
 
 ## 開發
 

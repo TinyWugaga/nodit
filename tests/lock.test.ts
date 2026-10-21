@@ -1,6 +1,6 @@
-import { execFile, spawn } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
-import { hostname, tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import lockfile from 'proper-lockfile'
@@ -27,7 +27,25 @@ async function lockAged(ms: number) {
   return p
 }
 
-it('a lock that turns stale right after the first look is reported busy and left alone', async () => {
+it('a stale lock is reported busy with recovery steps and never removed', async () => {
+  const p = await lockAged(60_000)
+  const before = await stat(p.lockfilePath)
+  for (let i = 0; i < 3; i++) {
+    const err = await acquireOwner(root, 'cli').catch((e) => e)
+    expect(err).toBeInstanceOf(LockBusyError)
+    expect(err.message).toContain('不會自動回收')
+    expect(err.message).toContain('手動刪除')
+  }
+  const after = await stat(p.lockfilePath)
+  expect([after.ino, after.mtimeMs]).toEqual([before.ino, before.mtimeMs])
+
+  // manual recovery: once a person removes the lock, the next attempt acquires it
+  await rm(p.lockfilePath, { recursive: true })
+  const owner = await acquireOwner(root, 'cli')
+  await owner.release()
+})
+
+it('a lock that turns stale during acquisition is left alone', async () => {
   const p = await lockAged(LOCK_OPTIONS.stale - 500)
   const before = (await stat(p.lockfilePath)).mtimeMs
   // the first clock read sees a fresh lock; every later read is 1s on, past the stale threshold
@@ -58,10 +76,16 @@ it('the guarded fs still lets the holder release its own lock', async () => {
   await expect(stat(p.lockfilePath)).rejects.toMatchObject({ code: 'ENOENT' })
 })
 
-it('a genuinely stale lock is still reclaimed', async () => {
-  await lockAged(60_000)
-  const owner = await acquireOwner(root, 'cli')
-  await owner.release()
+it('a paused holder whose lock went stale keeps it until it releases', async () => {
+  const held = await acquireOwner(root, 'cli')
+  const p = lockPaths(root)
+  const old = new Date(Date.now() - 60_000)
+  await utimes(p.lockfilePath, old, old)
+  await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+  expect((await stat(p.lockfilePath)).mtimeMs).toBe(old.getTime())
+  await held.release()
+  const next = await acquireOwner(root, 'cli')
+  await next.release()
 })
 
 it('connected CLI init prints the diagnostics behind a 422', async () => {
@@ -79,62 +103,3 @@ it('connected CLI init prints the diagnostics behind a 422', async () => {
   }
 }, 30_000)
 
-async function holdReclaim(holder: { pid: number; host?: string }) {
-  const p = lockPaths(root)
-  await writeFile(p.reclaim, JSON.stringify({ pid: holder.pid, host: holder.host ?? hostname(), token: 'held-elsewhere' }))
-  const old = new Date(Date.now() - 60_000)
-  await utimes(p.reclaim, old, old)
-  return p
-}
-
-it('a paused reclaimer keeps the reclaim mutex however old it is', async () => {
-  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
-  try {
-    const stale = await lockAged(60_000)
-    const before = (await stat(stale.lockfilePath)).ino
-    const p = await holdReclaim({ pid: child.pid! })
-    for (let i = 0; i < 3; i++) await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
-    expect((await stat(stale.lockfilePath)).ino).toBe(before)
-    expect(JSON.parse(await readFile(p.reclaim, 'utf8')).token).toBe('held-elsewhere')
-
-    // a dead holder is not cleared automatically either: that check-then-delete is itself racy
-    const exited = new Promise((r) => child.on('exit', r))
-    child.kill()
-    await exited
-    for (let i = 0; i < 3; i++) {
-      const err = await acquireOwner(root, 'cli').catch((e) => e)
-      expect(err).toBeInstanceOf(LockBusyError)
-      expect(err.message).toContain('手動刪除')
-    }
-    expect(JSON.parse(await readFile(p.reclaim, 'utf8')).token).toBe('held-elsewhere')
-    expect((await stat(stale.lockfilePath)).ino).toBe(before)
-
-    // manual recovery: once a person removes the mutex, the stale lock is reclaimed
-    await rm(p.reclaim)
-    const owner = await acquireOwner(root, 'cli')
-    await owner.release()
-  } finally {
-    child.kill()
-  }
-})
-
-it('a reclaim mutex from another host is never taken over', async () => {
-  await lockAged(60_000)
-  const p = await holdReclaim({ pid: 1, host: 'some-other-host' })
-  await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
-  const err = await acquireOwner(root, 'cli').catch((e) => e)
-  expect(err.message).toContain('some-other-host')
-  expect(JSON.parse(await readFile(p.reclaim, 'utf8')).host).toBe('some-other-host')
-})
-
-it('a reclaim mutex directory from an older version is left for manual recovery', async () => {
-  await lockAged(60_000)
-  const p = lockPaths(root)
-  await mkdir(p.reclaim)
-  const old = new Date(Date.now() - 60_000)
-  await utimes(p.reclaim, old, old)
-  const err = await acquireOwner(root, 'cli').catch((e) => e)
-  expect(err).toBeInstanceOf(LockBusyError)
-  expect(err.message).toContain('舊版')
-  expect((await stat(p.reclaim)).isDirectory()).toBe(true)
-})
