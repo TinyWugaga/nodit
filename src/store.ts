@@ -147,7 +147,17 @@ function pickHandles(a: XYPosition, b: XYPosition) {
   return dy >= 0 ? { sourceHandle: 'b', targetHandle: 't' } : { sourceHandle: 't', targetHandle: 'b' }
 }
 
-function buildNodes(prev: CardNode[], docs: ClientDoc[], layout: Record<string, XYPosition>, drafts: DraftManager): CardNode[] {
+/**
+ * Position precedence: a local move not yet saved, then the canonical layout file, then where the
+ * node already sits, then an automatic column slot.
+ */
+function buildNodes(
+  prev: CardNode[],
+  docs: ClientDoc[],
+  layout: Record<string, XYPosition>,
+  pending: Record<string, XYPosition>,
+  drafts: DraftManager,
+): CardNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]))
   const column: Record<CardKind, number> = { adr: 0, milestone: 0, task: 0 }
   const out: CardNode[] = []
@@ -156,7 +166,7 @@ function buildNodes(prev: CardNode[], docs: ClientDoc[], layout: Record<string, 
     if (!data) continue
     const old = prevById.get(doc.docKey)
     const slot = column[data.kind]++
-    const position = old?.position ?? layout[data.code] ?? { x: COLUMN_X[data.kind], y: slot * 210 }
+    const position = pending[data.code] ?? layout[data.code] ?? old?.position ?? { x: COLUMN_X[data.kind], y: slot * 210 }
     out.push({ ...(old ?? {}), id: doc.docKey, type: 'card', position, data })
   }
   return out
@@ -167,13 +177,13 @@ function buildEdges(prev: LinkEdge[], docs: ClientDoc[], nodes: CardNode[]): Lin
   for (const n of nodes) if (!nodeById.has(n.data.code)) nodeById.set(n.data.code, n)
   const selected = new Set(prev.filter((e) => e.selected).map((e) => e.id))
   const byKey = new Map<string, LinkEdge>()
-  const add = (src: CardNode, targetId: string, kind: LinkKind) => {
+  const add = (src: CardNode, revision: string, targetId: string, kind: LinkKind) => {
     const tgt = nodeById.get(targetId)
     if (!tgt || tgt.id === src.id) return
     const key = kind === 'relates' ? `relates:${[src.data.code, targetId].sort().join('~')}` : `${src.data.code}:${kind}:${targetId}`
     const existing = byKey.get(key)
     if (existing) {
-      existing.data!.storedAt.push({ docKey: src.id, to: targetId })
+      existing.data!.storedAt.push({ docKey: src.id, revision, to: targetId })
       return
     }
     const id = kind === 'relates' ? key : `${src.data.code}:${kind}:${targetId}`
@@ -182,7 +192,7 @@ function buildEdges(prev: LinkEdge[], docs: ClientDoc[], nodes: CardNode[]): Lin
       type: 'link',
       source: src.id,
       target: tgt.id,
-      data: { kind, storedAt: [{ docKey: src.id, to: targetId }] },
+      data: { kind, storedAt: [{ docKey: src.id, revision, to: targetId }] },
       selected: selected.has(id),
       ...pickHandles(src.position, tgt.position),
     })
@@ -191,11 +201,12 @@ function buildEdges(prev: LinkEdge[], docs: ClientDoc[], nodes: CardNode[]): Lin
     const c = doc.card
     const src = c && nodeById.get(c.id)
     if (!c || !src || src.id !== doc.docKey) continue
-    c.links.implements.forEach((t) => add(src, t, 'implements'))
-    if (c.links.milestone) add(src, c.links.milestone, 'part-of')
-    c.links.depends.forEach((t) => add(src, t, 'depends'))
-    c.links.supersedes.forEach((t) => add(src, t, 'supersedes'))
-    c.links.relates.forEach((t) => add(src, t, 'relates'))
+    const r = doc.revision
+    c.links.implements.forEach((t) => add(src, r, t, 'implements'))
+    if (c.links.milestone) add(src, r, c.links.milestone, 'part-of')
+    c.links.depends.forEach((t) => add(src, r, t, 'depends'))
+    c.links.supersedes.forEach((t) => add(src, r, t, 'supersedes'))
+    c.links.relates.forEach((t) => add(src, r, t, 'relates'))
   }
   return [...byKey.values()]
 }
@@ -207,9 +218,12 @@ function canHold(kind: CardKind, rel: LinkKind) {
 export const useProject = create<State>()(
   persist(
     (set, get) => {
+      /** positions moved locally (keyed by card id) that the layout file does not hold yet */
+      const pendingLayout: Record<string, XYPosition> = {}
+
       const rebuild = () => {
         const { docs, layout, nodes, edges } = get()
-        const nextNodes = buildNodes(nodes, docs, layout, drafts)
+        const nextNodes = buildNodes(nodes, docs, layout, pendingLayout, drafts)
         set({ nodes: nextNodes, edges: buildEdges(edges, docs, nextNodes) })
       }
 
@@ -261,17 +275,21 @@ export const useProject = create<State>()(
 
       const docByKey = (docKey: string) => get().docs.find((d) => d.docKey === docKey)
 
-      /** Discrete (non-draft) link write on one document, with the draft following our own revision. */
-      const linkWrite = async (docKey: string, change: { add?: LinkChange[]; remove?: LinkChange[] }) => {
+      /**
+       * Discrete (non-draft) link write on one document, with the draft following our own revision.
+       * `base` defaults to the loaded revision; edge removal passes the revision the edge was read at.
+       */
+      const linkWrite = async (docKey: string, change: { add?: LinkChange[]; remove?: LinkChange[] }, base?: string) => {
         const doc = docByKey(docKey)
         if (!doc) return false
         if (!doc.writable) {
           toast(`${doc.card?.id ?? doc.path} 目前不可寫入`)
           return false
         }
-        const result = await client.patchLinks(docKey, doc.revision, change)
+        const baseRevision = base ?? doc.revision
+        const result = await client.patchLinks(docKey, baseRevision, change)
         if (result.ok) {
-          drafts.rebaseOwn(docKey, doc.revision, result.envelope.doc.revision)
+          drafts.rebaseOwn(docKey, baseRevision, result.envelope.doc.revision)
           acceptDoc(result.envelope)
           rebuild()
           return true
@@ -285,11 +303,14 @@ export const useProject = create<State>()(
 
       let layoutTimer: ReturnType<typeof setTimeout> | undefined
       const saveLayout = async (retry = true): Promise<void> => {
-        const positions: Record<string, XYPosition> = {}
-        for (const n of get().nodes) positions[n.data.code] = n.position
-        const data = { ...get().layout, ...positions }
+        const placed: Record<string, XYPosition> = {}
+        for (const n of get().nodes) placed[n.data.code] = n.position
+        // only local moves override the file; everything else keeps the newest canonical value
+        const pending = { ...pendingLayout }
+        const data = { ...placed, ...get().layout, ...pending }
         const result = await client.putLayout(get().layoutRevision, data)
         if (result.ok) {
+          for (const [code, p] of Object.entries(pending)) if (pendingLayout[code] === p) delete pendingLayout[code]
           set({ layout: data, layoutRevision: result.revision })
           return
         }
@@ -325,6 +346,11 @@ export const useProject = create<State>()(
             changes.filter((c) => c.type !== 'remove' && c.type !== 'add'),
             get().nodes,
           )
+          for (const c of changes) {
+            if (c.type !== 'position' || !c.position) continue
+            const code = nodes.find((n) => n.id === c.id)?.data.code
+            if (code) pendingLayout[code] = nodes.find((n) => n.id === c.id)!.position
+          }
           const moved = changes.some((c) => c.type === 'position')
           set({ nodes, edges: moved ? buildEdges(get().edges, get().docs, nodes) : get().edges })
         },
@@ -374,8 +400,15 @@ export const useProject = create<State>()(
         removeEdge: async (edgeId) => {
           const edge = get().edges.find((e) => e.id === edgeId)
           if (!edge?.data) return
+          // each stored copy is checked against its own revision; not a transaction, so report per file
+          const failed: string[] = []
           for (const s of edge.data.storedAt) {
-            if (!(await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] }))) return
+            if (!(await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] }, s.revision))) {
+              failed.push(docByKey(s.docKey)?.path ?? s.docKey)
+            }
+          }
+          if (failed.length && failed.length < edge.data.storedAt.length) {
+            toast(`連線只移除了一部分：${failed.join('、')} 沒有寫入，該端的紀錄仍保留`)
           }
         },
 
@@ -396,7 +429,7 @@ export const useProject = create<State>()(
             add: [{ rel: kind, to: target.data.code }],
           })
           if (!ok) return
-          for (const s of others) await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] })
+          for (const s of others) await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] }, s.revision)
         },
 
         reverseEdge: async (edgeId) => {
@@ -411,7 +444,7 @@ export const useProject = create<State>()(
           }
           if (!(await linkWrite(edge.target, { add: [{ rel: edge.data.kind, to: src.data.code }] }))) return
           for (const s of edge.data.storedAt.filter((x) => x.docKey !== edge.target)) {
-            await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] })
+            await linkWrite(s.docKey, { remove: [{ rel: edge.data.kind, to: s.to }] }, s.revision)
           }
         },
 

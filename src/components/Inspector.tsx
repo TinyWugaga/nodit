@@ -59,17 +59,15 @@ function Select<T extends string>({
 function SectionText({ d, name, label, value, placeholder }: { d: CardData; name: string; label: string; value: string; placeholder: string }) {
   const { editField, openRaw } = useProject(useShallow((s) => ({ editField: s.editField, openRaw: s.openRaw })))
   const state = d.sectionStates[name] ?? 'missing'
-  const duplicate = state === 'duplicate'
+  const locked = state !== 'ok'
   return (
     <Section
       label={label}
       aside={
-        duplicate ? (
+        locked ? (
           <button type="button" className="text-btn mono" onClick={() => openRaw(d.docKey)}>
             raw
           </button>
-        ) : state === 'missing' && d.writable ? (
-          <span className="mono muted">new</span>
         ) : null
       }
     >
@@ -77,8 +75,14 @@ function SectionText({ d, name, label, value, placeholder }: { d: CardData; name
         className="input input--area"
         rows={3}
         value={value}
-        readOnly={!d.writable || duplicate}
-        placeholder={duplicate ? `## ${name} 出現多次，請用 raw 編輯修正` : placeholder}
+        readOnly={!d.writable || locked}
+        placeholder={
+          state === 'duplicate'
+            ? `## ${name} 出現多次，請用 raw 編輯修正`
+            : state === 'missing'
+              ? `找不到 ## ${name}，請用 raw 編輯新增`
+              : placeholder
+        }
         onChange={(e) => editField(d.docKey, SECTION_PREFIX + name, e.target.value)}
       />
     </Section>

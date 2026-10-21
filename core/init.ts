@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { CONFIG_FILE, DEFAULT_PATHS, type NoditConfig } from './config'
 import { CARD_KINDS, SCHEMA_VERSION } from './domain'
+import { lineDiff } from './diff'
 import { sha1 } from './parse'
 import { resolveInScope } from './scope'
 import { ValidationError, type InitOps, type Writer } from './writer'
@@ -17,6 +18,8 @@ import {
   TEMPLATE_VERSION,
   type SkillKind,
 } from './templates'
+
+export { lineDiff }
 
 export type InitAction = 'create' | 'append' | 'upgrade' | 'skip' | 'conflict'
 
@@ -49,28 +52,6 @@ export function publicPlan(plan: InitPlan) {
     ai: plan.ai,
     items: plan.items.map(({ mode: _m, text: _t, managedKey: _k, rendered: _r, ...rest }) => rest),
   }
-}
-
-/** Tiny LCS line diff for previews. */
-export function lineDiff(before: string, after: string, limit = 400): string {
-  const a = before.split('\n')
-  const b = after.split('\n')
-  if (a.length * b.length > 250_000) return after
-  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
-  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
-  const out: string[] = []
-  let i = 0
-  let j = 0
-  while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && a[i] === b[j]) {
-      out.push('  ' + a[i])
-      i++
-      j++
-    }
-    else if (j < b.length && (i >= a.length || dp[i][j + 1] >= dp[i + 1][j])) out.push('+ ' + b[j++])
-    else out.push('- ' + a[i++])
-  }
-  return out.slice(0, limit).join('\n')
 }
 
 function findBlock(text: string): { start: number; end: number } | 'none' | 'malformed' {
@@ -151,21 +132,19 @@ export function scopedRead(root: string, allowed: string[]): Pick<InitOps, 'read
   }
 }
 
-export function initPaths(config: NoditConfig) {
+export function initPaths(config: NoditConfig, ai = true) {
   return [
     CONFIG_FILE,
     '.gitignore',
     config.paths.architecture,
     ...CARD_KINDS.map((k) => config.paths[k]),
-    'AGENTS.md',
-    'CLAUDE.md',
-    ...(['adr', 'milestone', 'task'] as SkillKind[]).map(skillPath),
+    ...(ai ? ['AGENTS.md', 'CLAUDE.md', ...(['adr', 'milestone', 'task'] as SkillKind[]).map(skillPath)] : []),
   ]
 }
 
 /** Build a plan from what is on disk now. `ops.read` must be scoped to `initPaths(config)`. */
 export async function planInit(ops: Pick<InitOps, 'read'>, config: NoditConfig, configExists: boolean, ai: boolean): Promise<InitPlan> {
-  const files = await readAll(ops, initPaths(config))
+  const files = await readAll(ops, initPaths(config, ai))
   const items: Internal[] = []
   const managed = config.managed
 

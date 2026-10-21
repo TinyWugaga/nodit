@@ -15,7 +15,7 @@ type CardBase = {
   legacy: boolean
   inferred: string[]
   diagnostics: Diagnostic[]
-  /** managed sections: ok = editable, missing = appended on first edit, duplicate = raw only */
+  /** managed sections: only ok is editable; missing and duplicate are fixed through raw */
   sectionStates: Record<string, 'ok' | 'missing' | 'duplicate'>
   draft?: DraftView
 }
@@ -49,6 +49,7 @@ export type CardData = AdrData | MilestoneData | TaskData
 export type CardNode = Node<CardData, 'card'>
 
 /** where the relation is physically written: the storing doc and the id it points to */
-export type LinkData = { kind: LinkKind; storedAt: { docKey: string; to: string }[] }
+/** every document that stores this relation, with the revision it was read at */
+export type LinkData = { kind: LinkKind; storedAt: { docKey: string; revision: string; to: string }[] }
 
 export type LinkEdge = Edge<LinkData, 'link'>

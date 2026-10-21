@@ -2,8 +2,9 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { CARD_KINDS, LINK_FIELD, type CardKind } from './domain'
 import type { NoditConfig } from './config'
-import { parseDoc, sha1, type ParsedDoc } from './parse'
+import { docKeyOf, parseDoc, sha1, type ParsedDoc } from './parse'
 import type { Diagnostic } from './protocol'
+import { resolveReadable, ScopeError } from './scope'
 
 export const TMP_MARK = '.nodit-tmp-'
 
@@ -27,10 +28,28 @@ export function kindForPath(config: NoditConfig, rel: string): CardKind | undefi
 
 export async function readDoc(root: string, rel: string, kind: CardKind): Promise<ParsedDoc | null> {
   try {
-    return parseDoc(rel, await readFile(path.join(root, ...rel.split('/'))), kind)
+    return parseDoc(rel, await readFile(await resolveReadable(root, rel)), kind)
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    if (err instanceof ScopeError) return outsideDoc(rel, kind, err.message)
     throw err
+  }
+}
+
+/** Placeholder for a symlink leaving the project: listed with a diagnostic, never read. */
+function outsideDoc(rel: string, kind: CardKind, message: string): ParsedDoc {
+  const docKey = docKeyOf(rel)
+  return {
+    docKey,
+    path: rel,
+    kind,
+    revision: 'outside',
+    sectionStates: {},
+    sections: {},
+    diagnostics: [{ level: 'error', code: 'path-outside', message, docKey, path: rel }],
+    legacy: false,
+    inferred: [],
+    writable: false,
   }
 }
 
@@ -116,9 +135,11 @@ export type LayoutFile = { revision: string; data: Record<string, { x: number; y
 export async function readLayout(root: string, rel: string): Promise<{ layout: LayoutFile; diagnostics: Diagnostic[] }> {
   let buf: Buffer
   try {
-    buf = await readFile(path.join(root, ...rel.split('/')))
-  } catch {
-    return { layout: { revision: 'absent', data: {} }, diagnostics: [] }
+    buf = await readFile(await resolveReadable(root, rel))
+  } catch (err) {
+    const diagnostics: Diagnostic[] =
+      err instanceof ScopeError ? [{ level: 'error', code: 'path-outside', message: err.message, path: rel }] : []
+    return { layout: { revision: 'absent', data: {} }, diagnostics }
   }
   try {
     const data = JSON.parse(buf.toString('utf8'))

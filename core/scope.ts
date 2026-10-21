@@ -38,8 +38,22 @@ export async function resolveInScope(root: string, rel: string, allowed: string[
   } catch {
     throw new ScopeError(`無法解析路徑：${rel}`)
   }
-  if (realProbe !== realRoot && !realProbe.startsWith(realRoot + path.sep)) {
-    throw new ScopeError(`路徑經由 symlink 跳出專案：${rel}`)
-  }
+  if (!inside(realRoot, realProbe)) throw new ScopeError(`路徑經由 symlink 跳出專案：${rel}`)
+  return abs
+}
+
+function inside(realRoot: string, real: string) {
+  return real === realRoot || real.startsWith(realRoot + path.sep)
+}
+
+/**
+ * Resolve a project-relative path for reading. Symlinks are followed only while the final target
+ * stays inside the project root. A missing file rejects with the original ENOENT.
+ */
+export async function resolveReadable(root: string, rel: string): Promise<string> {
+  const realRoot = await realpath(root)
+  const abs = path.join(realRoot, ...rel.split('/'))
+  const real = await realpath(abs)
+  if (!inside(realRoot, real)) throw new ScopeError(`路徑經由 symlink 跳出專案：${rel}`)
   return abs
 }

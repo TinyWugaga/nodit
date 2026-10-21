@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
+import { resolveInScope, resolveReadable } from './scope'
 
 /** Every entry point (server, CLI) must lock with exactly these options. */
 export const LOCK_OPTIONS = Object.freeze({ stale: 10_000, update: 2_000, retries: 0, realpath: true })
@@ -43,7 +44,7 @@ async function writeAtomic(file: string, text: string, mode = 0o644) {
 
 export async function readOwner(root: string): Promise<OwnerInfo | null> {
   try {
-    return JSON.parse(await readFile(lockPaths(root).owner, 'utf8'))
+    return JSON.parse(await readFile(await resolveReadable(root, '.nodit/owner.json'), 'utf8'))
   } catch {
     return null
   }
@@ -52,7 +53,7 @@ export async function readOwner(root: string): Promise<OwnerInfo | null> {
 /** Token is only returned when it belongs to the expected owner and session. */
 export async function readToken(root: string, expect: Pick<OwnerInfo, 'ownerId' | 'sessionId'>): Promise<string | null> {
   try {
-    const t = JSON.parse(await readFile(lockPaths(root).token, 'utf8'))
+    const t = JSON.parse(await readFile(await resolveReadable(root, '.nodit/token'), 'utf8'))
     return t.ownerId === expect.ownerId && t.sessionId === expect.sessionId ? t.token : null
   } catch {
     return null
@@ -105,8 +106,12 @@ export class Owner {
 
 export async function acquireOwner(root: string, mode: OwnerMode, sessionId = randomUUID()): Promise<Owner> {
   const p = lockPaths(root)
+  // .nodit must be a real directory inside the project, never a symlink to somewhere else
+  await resolveInScope(root, '.nodit', ['.nodit'])
   const createdDir = !(await stat(p.dir).then(() => true, () => false))
   await mkdir(p.dir, { recursive: true })
+  await resolveInScope(root, '.nodit', ['.nodit'])
+  for (const name of ['writer.lock', 'owner.json', 'token']) await resolveInScope(root, `.nodit/${name}`, ['.nodit'])
   let owner: Owner | undefined
   let release: () => Promise<void>
   try {

@@ -216,6 +216,8 @@ export class Writer {
         if (!managed.includes(name)) problems.push(invalid(current, 'section-unknown', `${name} 不是受管段落`))
         else if (current.sectionStates[name]?.state === 'duplicate') {
           problems.push(invalid(current, 'section-duplicate', `## ${name} 出現多次，請改用 raw 編輯`))
+        } else if (current.sectionStates[name]?.state !== 'ok') {
+          problems.push(invalid(current, 'section-missing', `找不到 ## ${name}，請改用 raw 編輯新增`))
         }
       }
       if (problems.length) throw new ValidationError(problems)
@@ -226,10 +228,6 @@ export class Writer {
         const split = splitDoc(next)
         const state = readSections(next, split.bodyStart, [name])[name]
         if (state.state === 'ok') next = replaceSection(next, state, text, eol)
-        else if (state.state === 'missing' && text.trim()) {
-          const body = next.endsWith(eol) || next === '' ? next : next + eol
-          next = `${body}${eol}## ${name}${eol}${eol}${text.trim().replace(/\r?\n/g, eol)}${eol}`
-        }
       }
       try {
         if (patch.fields && Object.keys(patch.fields).length) next = setFields(next, normalizeFields(patch.fields))

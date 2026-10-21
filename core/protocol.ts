@@ -1,3 +1,4 @@
+import type { NoditConfig } from './config'
 import type { CardKind, CardRecord } from './domain'
 
 export type Diagnostic = {
@@ -19,15 +20,23 @@ export type ClientDoc = {
   sections: Record<string, SectionView>
   diagnostics: Diagnostic[]
   legacy: boolean
+  /** card is the last valid content; the file on disk currently fails to parse */
+  stale?: boolean
   inferred: string[]
   writable: boolean
 }
 
 export type Envelope<T> = { projectId: string; sessionId: string; rev: number } & T
 
+/** Per-component setup state; AI entries are `ok` once init recorded a baseline for them. */
+export type ComponentState = 'ok' | 'missing' | 'invalid'
+export type ProjectStatus = { initialized: boolean; components: Record<string, ComponentState> }
+
 export type ProjectPayload = {
   name: string
   initialized: boolean
+  config: NoditConfig
+  status: ProjectStatus
   docs: ClientDoc[]
   layout: { revision: string; data: Record<string, { x: number; y: number }> }
   architecture: { path: string; revision: string }

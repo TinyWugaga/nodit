@@ -3,6 +3,7 @@ import { readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { SCHEMA_VERSION, type CardKind } from './domain'
 import type { Diagnostic } from './protocol'
+import { resolveReadable, ScopeError } from './scope'
 
 export const CONFIG_FILE = 'nodit.config.json'
 
@@ -24,6 +25,13 @@ export const DEFAULT_PATHS: NoditPaths = {
   layout: '.nodit/layout.json',
 }
 
+/** Unusable config file: callers that already hold a valid config keep it instead of the fallback. */
+export const CONFIG_INVALID = 'config-invalid'
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
 function safeRelative(p: unknown): p is string {
   if (typeof p !== 'string' || !p || p.includes('\0')) return false
   const norm = path.posix.normalize(p.replace(/\\/g, '/'))
@@ -43,17 +51,29 @@ export async function loadConfig(root: string): Promise<{ config: NoditConfig; e
 
   let text: string
   try {
-    text = await readFile(path.join(root, CONFIG_FILE), 'utf8')
-  } catch {
-    return { config: base, exists: false, diagnostics }
+    text = await readFile(await resolveReadable(root, CONFIG_FILE), 'utf8')
+  } catch (err) {
+    if (!(err instanceof ScopeError)) return { config: base, exists: false, diagnostics }
+    diagnostics.push({ level: 'error', code: CONFIG_INVALID, message: `${CONFIG_FILE}：${err.message}` })
+    return { config: base, exists: true, diagnostics }
   }
 
+  const invalid = (message: string) => {
+    diagnostics.push({ level: 'error', code: CONFIG_INVALID, message: `${CONFIG_FILE} ${message}` })
+    return { config: base, exists: true, diagnostics }
+  }
   let data: Partial<NoditConfig>
   try {
     data = JSON.parse(text)
   } catch (err) {
-    diagnostics.push({ level: 'error', code: 'config-invalid', message: `${CONFIG_FILE} 不是有效的 JSON：${(err as Error).message}` })
-    return { config: base, exists: true, diagnostics }
+    return invalid(`不是有效的 JSON：${(err as Error).message}`)
+  }
+  if (!isPlainObject(data)) return invalid('頂層必須是 JSON 物件')
+  if (data.schemaVersion !== undefined && (typeof data.schemaVersion !== 'number' || !Number.isInteger(data.schemaVersion))) {
+    return invalid('的 schemaVersion 必須是整數')
+  }
+  for (const key of ['paths', 'watch', 'managed'] as const) {
+    if (data[key] !== undefined && !isPlainObject(data[key])) return invalid(`的 ${key} 必須是物件`)
   }
 
   if (data.schemaVersion !== undefined && data.schemaVersion > SCHEMA_VERSION) {
@@ -72,7 +92,7 @@ export async function loadConfig(root: string): Promise<{ config: NoditConfig; e
       projectId: typeof data.projectId === 'string' && data.projectId ? data.projectId : fallbackId,
       paths,
       watch: { usePolling: Boolean(data.watch?.usePolling) },
-      managed: data.managed && typeof data.managed === 'object' ? data.managed : {},
+      managed: data.managed ?? {},
     },
     exists: true,
     diagnostics,

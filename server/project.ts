@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { watch, type FSWatcher } from 'chokidar'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { CONFIG_FILE, loadConfig, type NoditConfig } from '../core/config'
+import { CONFIG_FILE, CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { CARD_KINDS } from '../core/domain'
 import { sha1, toClientDoc, type ParsedDoc } from '../core/parse'
-import type { Diagnostic, Envelope, ProjectPayload } from '../core/protocol'
+import type { ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatus } from '../core/protocol'
 import { crossValidate, readLayout, scanDocs, TMP_MARK, type LayoutFile } from '../core/scan'
+import { resolveReadable } from '../core/scope'
+import { skillPath } from '../core/templates'
 
 export type ChangeEvent = Envelope<{ changed: string[] }>
 
@@ -26,12 +28,15 @@ export class ProjectService extends EventEmitter {
   private layout: LayoutFile = { revision: 'absent', data: {} }
   private layoutDiagnostics: Diagnostic[] = []
   architectureRevision = 'absent'
+  private status: ProjectStatus = { initialized: false, components: {} }
   private scanChain: Promise<unknown> = Promise.resolve()
   private watcher?: FSWatcher
+  private watched: string[] = []
   private timer?: NodeJS.Timeout
 
   constructor(readonly root: string) {
     super()
+    this.on('error', (err) => console.error('[nodit] rescan failed:', err))
   }
 
   get projectId() {
@@ -50,6 +55,8 @@ export class ProjectService extends EventEmitter {
     return this.envelope({
       name: path.basename(this.root),
       initialized: this.configExists,
+      config: this.config,
+      status: this.status,
       docs: [...this.docs.values()].map(toClientDoc),
       layout: this.layout,
       architecture: { path: this.config.paths.architecture, revision: this.architectureRevision },
@@ -59,15 +66,28 @@ export class ProjectService extends EventEmitter {
 
   async start() {
     await this.rescan()
-    const paths = [...CARD_KINDS.map((k) => this.config.paths[k]), this.config.paths.layout, this.config.paths.architecture, CONFIG_FILE].map((p) =>
-      path.join(this.root, p),
-    )
-    this.watcher = watch(paths, {
+    this.watched = this.watchPaths(this.config)
+    this.watcher = watch(this.watched, {
       ignoreInitial: true,
       usePolling: this.config.watch.usePolling,
       ignored: (p) => path.basename(p).includes(TMP_MARK),
     })
     this.watcher.on('all', () => this.scheduleRescan())
+  }
+
+  private watchPaths(config: NoditConfig) {
+    return [...CARD_KINDS.map((k) => config.paths[k]), config.paths.layout, config.paths.architecture, CONFIG_FILE].map((p) => path.join(this.root, p))
+  }
+
+  /** Follow path changes in an accepted config; usePolling only takes effect on restart. */
+  private updateWatch() {
+    if (!this.watcher) return
+    const next = this.watchPaths(this.config)
+    const removed = this.watched.filter((p) => !next.includes(p))
+    const added = next.filter((p) => !this.watched.includes(p))
+    if (removed.length) this.watcher.unwatch(removed)
+    if (added.length) this.watcher.add(added)
+    this.watched = next
   }
 
   async stop() {
@@ -77,21 +97,28 @@ export class ProjectService extends EventEmitter {
 
   private scheduleRescan() {
     clearTimeout(this.timer)
-    this.timer = setTimeout(() => void this.rescan(), 80)
+    this.timer = setTimeout(() => this.rescan().catch(() => {}), 80)
   }
 
   /** Sequential full rescan; publishes a new rev only when content actually changed. */
   rescan(): Promise<string[]> {
     const job = this.scanChain.then(async () => {
-      const { config, exists, diagnostics } = await loadConfig(this.root)
+      const loaded = await loadConfig(this.root)
+      const { diagnostics } = loaded
+      // an unreadable config keeps the last accepted one instead of falling back to defaults
+      const keep = this.config && diagnostics.some((d) => d.code === CONFIG_INVALID)
+      const config = keep ? this.config : loaded.config
+      const exists = keep ? this.configExists : loaded.exists
       const configChanged = JSON.stringify(config) !== JSON.stringify(this.config) || exists !== this.configExists
       const changedExtra: string[] = []
-      const scanned = await scanDocs(this.root, config)
+      const scanned = (await scanDocs(this.root, config)).map((d) => this.retainCard(d))
       const { docs, diagnostics: cross } = crossValidate(scanned)
       const { layout, diagnostics: layoutDiag } = await readLayout(this.root, config.paths.layout)
-      const architectureRevision = await fileRevision(path.join(this.root, ...config.paths.architecture.split('/')))
+      const architectureRevision = await fileRevision(this.root, config.paths.architecture)
       const architectureChanged = architectureRevision !== this.architectureRevision
       if (architectureChanged) changedExtra.push('architecture')
+      const status = await this.readStatus(config, exists, keep || diagnostics.some((d) => d.code === CONFIG_INVALID), architectureRevision)
+      const statusChanged = JSON.stringify(status) !== JSON.stringify(this.status)
 
       const next = new Map(docs.map((d) => [d.docKey, d]))
       const changed: string[] = []
@@ -107,8 +134,10 @@ export class ProjectService extends EventEmitter {
       this.layout = layout
       this.layoutDiagnostics = layoutDiag
       this.architectureRevision = architectureRevision
+      this.status = status
+      if (configChanged) this.updateWatch()
 
-      if (changed.length || layoutChanged || configChanged || architectureChanged || this.rev === 0) {
+      if (changed.length || layoutChanged || configChanged || architectureChanged || statusChanged || this.rev === 0) {
         this.rev++
         this.emit('change', this.envelope({ changed: [...changed, ...changedExtra] }) satisfies ChangeEvent)
       }
@@ -116,6 +145,37 @@ export class ProjectService extends EventEmitter {
     })
     this.scanChain = job.catch((err) => this.emit('error', err))
     return job
+  }
+
+  private async readStatus(config: NoditConfig, exists: boolean, invalid: boolean, architectureRevision: string): Promise<ProjectStatus> {
+    const components: Record<string, ComponentState> = { config: invalid ? 'invalid' : exists ? 'ok' : 'missing' }
+    for (const kind of CARD_KINDS) {
+      const dir = await stat(path.join(this.root, ...config.paths[kind].split('/'))).catch(() => null)
+      components[kind] = dir?.isDirectory() ? 'ok' : 'missing'
+    }
+    components.architecture = architectureRevision === 'absent' ? 'missing' : 'ok'
+    for (const key of ['AGENTS.md#nodit', 'CLAUDE.md#nodit', ...(['adr', 'milestone', 'task'] as const).map(skillPath)]) {
+      components[key] = config.managed[key] ? 'ok' : 'missing'
+    }
+    return { initialized: exists && !invalid, components }
+  }
+
+  /**
+   * A document that stops parsing keeps its last valid card (marked stale) so it does not vanish
+   * from the graph; its own diagnostics still describe the current file and it stays read-only.
+   */
+  private retainCard(d: ParsedDoc): ParsedDoc {
+    const prev = this.docs.get(d.docKey)
+    if (d.card || !prev?.card || !d.diagnostics.some((x) => x.level === 'error')) return d
+    return {
+      ...d,
+      card: prev.card,
+      stale: true,
+      diagnostics: [
+        ...d.diagnostics,
+        { level: 'warning', code: 'card-stale', message: '目前檔案無效，顯示最後一次有效的內容', docKey: d.docKey, path: d.path },
+      ],
+    }
   }
 
   private docDiagChanged(k: string, d: ParsedDoc) {
@@ -165,9 +225,9 @@ export class ProjectService extends EventEmitter {
 
 export const CROSS_CODES = ['id-duplicate', 'link-dangling', 'supersede-status']
 
-async function fileRevision(abs: string) {
+async function fileRevision(root: string, rel: string) {
   try {
-    return sha1(await readFile(abs))
+    return sha1(await readFile(await resolveReadable(root, rel)))
   } catch {
     return 'absent'
   }

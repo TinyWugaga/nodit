@@ -2177,6 +2177,19 @@ button.link-row:hover {
   resize: none;
   tab-size: 2;
 }
+.raw-diff {
+  margin: 0;
+  overflow: auto;
+  color: var(--ink-3);
+  white-space: pre-wrap;
+}
+.raw-diff .is-add {
+  color: var(--accent-text);
+}
+.raw-diff .is-del {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
 .raw-editor:focus {
   outline: none;
   border-color: var(--accent);

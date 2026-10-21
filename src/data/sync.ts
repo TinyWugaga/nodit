@@ -60,7 +60,8 @@ export class ProjectSync {
     const gen = this.client.connGen
     try {
       const snap = await this.client.getProject()
-      if (gen !== this.client.connGen && this.meta) return
+      // a response from an older connection is never applied; that connection's hello refetches
+      if (gen !== this.client.connGen) return
       if (!shouldApply(this.meta, this.expectedSession, snap)) return
       this.meta = metaOf(snap)
       this.handlers.apply(snap)

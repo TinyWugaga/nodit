@@ -35,12 +35,18 @@ afterEach(async () => {
 })
 
 describe('sections', () => {
-  it('replaces one section, appends a missing one, keeps custom sections', async () => {
+  it('replaces one section and keeps custom sections', async () => {
     const d = await doc(ADR, 'adr')
-    await writer.updateDoc(d, d.revision, { sections: { Decision: 'new decision', Consequences: 'cost' } })
-    const text = await read(ADR)
-    expect(text).toContain('## Context\n\nold context\n\n## Decision\n\nnew decision\n\n## Notes\n\nkeep me\n')
-    expect(text.endsWith('## Consequences\n\ncost\n')).toBe(true)
+    await writer.updateDoc(d, d.revision, { sections: { Decision: 'new decision' } })
+    expect(await read(ADR)).toContain('## Context\n\nold context\n\n## Decision\n\nnew decision\n\n## Notes\n\nkeep me\n')
+  })
+
+  it('refuses to edit a missing section', async () => {
+    const d = await doc(ADR, 'adr')
+    const err = await writer.updateDoc(d, d.revision, { sections: { Consequences: 'cost' } }).catch((e) => e)
+    expect(err).toBeInstanceOf(ValidationError)
+    expect((err as ValidationError).diagnostics[0].code).toBe('section-missing')
+    expect(await read(ADR)).toBe(ADR_TEXT)
   })
 
   it('refuses to edit a duplicated section', async () => {

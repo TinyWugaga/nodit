@@ -118,11 +118,11 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
 
   for (const key of ['date', 'due'] as const) {
     if (data[key] !== undefined && (typeof data[key] !== 'string' || !DATE.test(data[key] as string))) {
-      diag('warning', 'date-format', `${key} 應為 YYYY-MM-DD`)
+      diag('error', 'date-format', `${key} 應為 YYYY-MM-DD`)
     }
   }
   if (data.priority !== undefined && !(PRIORITIES as readonly unknown[]).includes(data.priority)) {
-    diag('warning', 'priority-invalid', `priority 必須是 ${PRIORITIES.join(' / ')}`)
+    diag('error', 'priority-invalid', `priority 必須是 ${PRIORITIES.join(' / ')}`)
   }
 
   const links: CardLinks = { implements: [], depends: [], supersedes: [], relates: [] }
@@ -134,14 +134,18 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
       diag('warning', 'link-unsupported', `${kind} 不支援 ${field}，已忽略`)
       continue
     }
-    if (rule.single) {
-      if (typeof data[field] !== 'string') diag('error', 'link-invalid', `${field} 必須是單一 ID`)
-      else links.milestone = data[field] as string
+    const list = rule.single ? (typeof data[field] === 'string' ? [data[field] as string] : null) : strList(data[field])
+    if (!list) {
+      diag('error', 'link-invalid', rule.single ? `${field} 必須是單一 ID` : `${field} 必須是 ID 陣列`)
       continue
     }
-    const list = strList(data[field])
-    if (!list) diag('error', 'link-invalid', `${field} 必須是 ID 陣列`)
-    else (links[field as 'implements' | 'depends' | 'supersedes' | 'relates'] = list)
+    const wrong = list.filter((t) => !rule.target.includes(kindOfId(t) as CardKind))
+    if (wrong.length) {
+      diag('error', 'link-target', `${field} 只能指向 ${rule.target.join(' / ')}：${wrong.join('、')}`)
+      continue
+    }
+    if (rule.single) links.milestone = list[0]
+    else links[field as 'implements' | 'depends' | 'supersedes' | 'relates'] = list
   }
 
   const hasError = diagnostics.some((d) => d.level === 'error')

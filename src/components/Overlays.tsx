@@ -1,6 +1,7 @@
 import { AlertTriangle, FileCode2, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { lineDiff } from '../../core/diff'
 import type { Diagnostic } from '../../core/protocol'
 import { LINK_META } from '../presentation'
 import { client, useProject } from '../store'
@@ -29,6 +30,8 @@ export function RawEditor() {
   const [problems, setProblems] = useState<Diagnostic[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /** legacy conversion shows the full diff and needs a second confirmation before writing */
+  const [preview, setPreview] = useState<string | null>(null)
 
   const load = async (key: string) => {
     const raw = await client.getRaw(key)
@@ -37,6 +40,7 @@ export function RawEditor() {
     setOriginal(raw.text)
     setProblems([])
     setMessage(null)
+    setPreview(null)
   }
 
   useEffect(() => {
@@ -48,6 +52,11 @@ export function RawEditor() {
 
   const save = async () => {
     if (!base) return
+    if (doc.legacy && preview === null) {
+      setPreview(lineDiff(original, text))
+      return
+    }
+    setPreview(null)
     setSaving(true)
     const result = await saveRaw(rawDocKey, base, text)
     setSaving(false)
@@ -91,7 +100,18 @@ export function RawEditor() {
             </div>
           </div>
         )}
-        <textarea className="raw-editor mono" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+        {preview !== null ? (
+          <pre className="raw-editor raw-diff mono" aria-label="轉換 diff 預覽">
+            {preview.split('\n').map((line, i) => (
+              <span key={i} className={line.startsWith('+ ') ? 'is-add' : line.startsWith('- ') ? 'is-del' : undefined}>
+                {line}
+                {'\n'}
+              </span>
+            ))}
+          </pre>
+        ) : (
+          <textarea className="raw-editor mono" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
+        )}
         {problems.length > 0 && (
           <ul className="raw-problems">
             {problems.map((p, i) => (
@@ -103,12 +123,20 @@ export function RawEditor() {
           </ul>
         )}
         <footer className="modal__foot">
-          <span className="mono muted">{message ?? (text === original ? '未修改' : '尚未儲存')}</span>
-          <button type="button" className="btn" onClick={closeRaw}>
-            關閉
-          </button>
+          <span className="mono muted">
+            {preview !== null ? '確認 legacy 轉換的變更後再寫入' : (message ?? (text === original ? '未修改' : '尚未儲存'))}
+          </span>
+          {preview !== null ? (
+            <button type="button" className="btn" onClick={() => setPreview(null)}>
+              返回編輯
+            </button>
+          ) : (
+            <button type="button" className="btn" onClick={closeRaw}>
+              關閉
+            </button>
+          )}
           <button type="button" className="btn btn--primary" disabled={saving || text === original || !base} onClick={() => void save()}>
-            驗證並儲存
+            {!doc.legacy ? '驗證並儲存' : preview === null ? '預覽轉換' : '確認轉換並儲存'}
           </button>
         </footer>
       </div>
