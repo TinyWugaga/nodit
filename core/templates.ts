@@ -172,4 +172,4 @@ export function renderArchitecture() {
   ].join('\n')
 }
 
-export const GITIGNORE_LINES = ['.nodit/writer.lock', '.nodit/owner.json', '.nodit/token']
+export const GITIGNORE_LINES = ['.nodit/writer.lock', '.nodit/writer.lock.reclaim*', '.nodit/owner.json', '.nodit/token']

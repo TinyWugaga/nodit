@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { execFile, spawn } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import lockfile from 'proper-lockfile'
@@ -78,3 +78,42 @@ it('connected CLI init prints the diagnostics behind a 422', async () => {
     await srv.close()
   }
 }, 30_000)
+
+async function holdReclaim(holder: { pid: number; host?: string }) {
+  const p = lockPaths(root)
+  await writeFile(p.reclaim, JSON.stringify({ pid: holder.pid, host: holder.host ?? hostname(), token: 'held-elsewhere' }))
+  const old = new Date(Date.now() - 60_000)
+  await utimes(p.reclaim, old, old)
+  return p
+}
+
+it('a paused reclaimer keeps the reclaim mutex however old it is', async () => {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+  try {
+    const stale = await lockAged(60_000)
+    const before = (await stat(stale.lockfilePath)).ino
+    const p = await holdReclaim({ pid: child.pid! })
+    for (let i = 0; i < 3; i++) await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+    expect((await stat(stale.lockfilePath)).ino).toBe(before)
+    expect(JSON.parse(await readFile(p.reclaim, 'utf8')).token).toBe('held-elsewhere')
+
+    // once the holder is gone, the next attempt clears its mutex and the one after reclaims
+    const exited = new Promise((r) => child.on('exit', r))
+    child.kill()
+    await exited
+    await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+    await expect(stat(p.reclaim)).rejects.toMatchObject({ code: 'ENOENT' })
+    const owner = await acquireOwner(root, 'cli')
+    await owner.release()
+  } finally {
+    child.kill()
+  }
+})
+
+it('a reclaim mutex from another host is never taken over', async () => {
+  await lockAged(60_000)
+  const p = await holdReclaim({ pid: 1, host: 'some-other-host' })
+  await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+  await expect(acquireOwner(root, 'cli')).rejects.toBeInstanceOf(LockBusyError)
+  expect(JSON.parse(await readFile(p.reclaim, 'utf8')).host).toBe('some-other-host')
+})

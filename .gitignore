@@ -3,5 +3,6 @@ dist
 .DS_Store
 *.local
 **/.nodit/writer.lock
+**/.nodit/writer.lock.reclaim*
 **/.nodit/owner.json
 **/.nodit/token

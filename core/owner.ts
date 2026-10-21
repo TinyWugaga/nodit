@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
-import { lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
+import { link, lstat, mkdir, readdir, readFile, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { hostname } from 'node:os'
 import path from 'node:path'
 import lockfile from 'proper-lockfile'
 import { resolveInScope, resolveReadable, ScopeError } from './scope'
@@ -137,11 +138,71 @@ export function noReclaimFs(lockfilePath: string): typeof fs {
   return guarded
 }
 
+type ReclaimHolder = { pid: number; host: string; token: string }
+
+function processAlive(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+async function readHolder(file: string): Promise<ReclaimHolder | 'unreadable' | null> {
+  try {
+    const h = JSON.parse(await readFile(file, 'utf8'))
+    return Number.isInteger(h?.pid) && typeof h.host === 'string' && typeof h.token === 'string' ? h : 'unreadable'
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'ENOENT' ? null : 'unreadable'
+  }
+}
+
+/**
+ * Reclaim mutex as a file holding { pid, host, token }, created atomically with link(). It is never
+ * taken over by age: a reclaimer that is merely paused keeps it, so it cannot wake up and delete a
+ * lock someone else created meanwhile. Only a holder known to have exited (same host, pid gone) is
+ * cleared, and the attempt that clears it still reports busy.
+ */
+async function takeReclaimMutex(p: ReturnType<typeof lockPaths>): Promise<() => Promise<void>> {
+  const me: ReclaimHolder = { pid: process.pid, host: hostname(), token: randomUUID() }
+  const tmp = `${p.reclaim}.${me.token}.tmp`
+  await writeFile(tmp, JSON.stringify(me), { flag: 'wx' })
+  try {
+    await link(tmp, p.reclaim)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    await clearDeadReclaimer(p.reclaim)
+    throw busy()
+  } finally {
+    await unlink(tmp).catch(() => {})
+  }
+  return async () => {
+    const held = await readHolder(p.reclaim)
+    if (held && held !== 'unreadable' && held.token === me.token) await unlink(p.reclaim).catch(() => {})
+  }
+}
+
+async function clearDeadReclaimer(file: string) {
+  const entry = await lstat(file).catch(() => null)
+  if (!entry) return
+  // directory left by an older Nodit version, which has no holder identity: age is all there is
+  if (entry.isDirectory()) {
+    if (isStale(entry.mtimeMs)) await rmdir(file).catch(() => {})
+    return
+  }
+  const held = await readHolder(file)
+  if (!held || held === 'unreadable' || held.host !== hostname() || processAlive(held.pid)) return
+  const again = await readHolder(file)
+  if (again && again !== 'unreadable' && again.token === held.token) await unlink(file).catch(() => {})
+}
+
 /**
  * proper-lockfile reclaims a stale lock with stat → rmdir → mkdir, so a process acting on an older
  * stat can delete the lock another process just created and both end up holding it. We remove a
- * stale lock ourselves, only while holding the reclaim mutex and only after re-checking it there;
- * proper-lockfile then never sees a stale lock and the winner is decided by its atomic mkdir.
+ * stale lock ourselves, only while holding the reclaim mutex, only after re-checking it there and
+ * only if it is still the same directory; proper-lockfile then never sees a stale lock and the winner
+ * is decided by its atomic mkdir.
  */
 async function reclaimStale(p: ReturnType<typeof lockPaths>) {
   const current = await stat(p.lockfilePath).catch(() => null)
@@ -150,20 +211,14 @@ async function reclaimStale(p: ReturnType<typeof lockPaths>) {
     if (isStale(current.mtimeMs - NEAR_STALE_MARGIN)) throw busy()
     return
   }
-  try {
-    await mkdir(p.reclaim)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
-    // left behind by a reclaimer that died; clear it so a later attempt can proceed, but not this one
-    const held = await stat(p.reclaim).catch(() => null)
-    if (held && isStale(held.mtimeMs)) await rmdir(p.reclaim).catch(() => {})
-    throw busy()
-  }
+  const release = await takeReclaimMutex(p)
   try {
     const again = await stat(p.lockfilePath).catch(() => null)
-    if (again && isStale(again.mtimeMs)) await rm(p.lockfilePath, { recursive: true, force: true })
+    if (!again || !isStale(again.mtimeMs)) return
+    const now = await stat(p.lockfilePath).catch(() => null)
+    if (now && now.ino === again.ino && now.mtimeMs === again.mtimeMs) await rmdir(p.lockfilePath).catch(() => {})
   } finally {
-    await rmdir(p.reclaim).catch(() => {})
+    await release()
   }
 }
 
