@@ -1,7 +1,7 @@
 import createDOMPurify from 'dompurify'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
-import { renderMarkdown, sanitizeSvg } from '../src/architecture/render'
+import { parseTree, renderMarkdown, sanitizeSvg } from '../src/architecture/render'
 
 const purify = createDOMPurify(new JSDOM('').window as unknown as Window & typeof globalThis)
 const known = new Set(['ADR-001', 'MS-01', 'T-003'])
@@ -50,6 +50,35 @@ describe('architecture renderer', () => {
       { id: 'sec-概觀-1', text: '概觀', level: 2 },
     ])
     expect(html).toContain('<h2 id="sec-概觀-1">概觀</h2>')
+  })
+
+  it('parses nodit-tree indentation into nested nodes and tolerates sloppy indents', () => {
+    const tree = parseTree(['core/          規則', '  writer.ts    寫入', '      deep.ts  過度縮排', '  scope.ts', 'README.md\t說明', ''].join('\n'))
+    expect(tree).toEqual([
+      {
+        name: 'core/',
+        desc: '規則',
+        children: [
+          { name: 'writer.ts', desc: '寫入', children: [{ name: 'deep.ts', desc: '過度縮排', children: [] }] },
+          { name: 'scope.ts', desc: '', children: [] },
+        ],
+      },
+      { name: 'README.md', desc: '說明', children: [] },
+    ])
+  })
+
+  it('moves nodit-tree blocks out of the document and links card codes in descriptions', () => {
+    const { html, trees, toc } = render(['## 專案結構', '', '```nodit-tree', 'core/        見 ADR-001', '  a.ts       <img src=x onerror="alert(1)">`code`', 'b.ts', '```'].join('\n'))
+    expect(toc).toEqual([{ id: 'sec-專案結構', text: '專案結構', level: 2 }])
+    expect(html).not.toContain('core/')
+    expect(html).toContain('<a href="#structure" data-tab="structure">')
+    expect(trees).toHaveLength(1)
+    const [core, b] = trees[0]!
+    expect(core).toMatchObject({ name: 'core/', dir: true })
+    expect(core!.html).toContain('data-card="ADR-001"')
+    expect(core!.children[0]!.html).not.toMatch(/onerror/)
+    expect(core!.children[0]!.html).toContain('<code>code</code>')
+    expect(b).toMatchObject({ name: 'b.ts', dir: false, html: '', children: [] })
   })
 
   it('sanitizes mermaid SVG output', () => {

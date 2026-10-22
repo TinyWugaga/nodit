@@ -180,6 +180,7 @@ kbd {
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -2626,5 +2627,117 @@ button.link-row:hover {
   }
   .arch__scroll {
     padding: 24px 20px 48px;
+  }
+}
+
+/* ---------- architecture: structure tab ---------- */
+
+.arch__tabs {
+  padding-left: 0;
+}
+.arch__tab {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.arch__tab:hover {
+  color: var(--ink);
+}
+.arch__tab.is-active {
+  background: var(--highest);
+  color: var(--ink);
+}
+.arch__toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.arch__body .tree-ref a {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.arch__body .tree,
+.arch__body .tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.arch__body .tree {
+  margin-bottom: var(--sp-md);
+}
+.arch__body .tree ul {
+  margin-left: 11px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.arch__body .tree li + li {
+  margin-top: 0;
+}
+.tree__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--sp-md);
+  padding: 3px var(--sp-xs);
+  line-height: 1.6;
+}
+.tree__row:hover {
+  background: var(--container);
+}
+.tree__toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+button.tree__toggle {
+  cursor: pointer;
+}
+.tree__chevron {
+  flex: none;
+  color: var(--ink-3);
+  transition: transform 0.15s;
+}
+.tree__chevron.is-open {
+  transform: rotate(90deg);
+}
+.tree__chevron.is-leaf {
+  visibility: hidden;
+}
+.tree__icon {
+  flex: none;
+  color: var(--accent-text);
+}
+.tree__name {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tree__desc {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .arch {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .arch .arch__toc {
+    display: flex;
+  }
+  .arch__toc-list,
+  .arch__path {
+    display: none;
   }
 }

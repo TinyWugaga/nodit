@@ -53,56 +53,52 @@ const decision = 'ADR-001' // 不會變成連結
 
 程式碼分成三層：`core/` 是不依賴 HTTP 與瀏覽器的檔案讀寫邏輯，`server/` 把它包成 CLI 與本地 API，`src/` 是瀏覽器 UI。UI 不碰 `core/` 的檔案讀寫，只共用型別、領域規則與純函式（例如 `inferLinkKind`、`diffLines`）。
 
-```text
-nodit/
-├── bin/nodit.mjs        全域 nodit 指令的入口，透過 tsx 載入 server/cli.ts
-├── core/                檔案格式與寫入規則（server 和 CLI 共用）
-├── server/              CLI 指令、HTTP API、SSE、檔案監聽
-├── src/                 React UI
-├── tests/               vitest 測試
-├── docs/decisions/      Nodit 自己的開發決策紀錄
-├── examples/demo/       開發用的 demo 專案（npm run dev:server 開的就是它）
-├── index.html           Vite 入口
-└── vite.config.ts
+```nodit-tree
+bin/
+  nodit.mjs                全域 nodit 指令的入口，透過 tsx 載入 `server/cli.ts`
+core/                      檔案格式與寫入規則，server 和 CLI 共用
+  domain.ts                卡片種類、status、關聯種類等領域常數
+  config.ts                讀取 `nodit.config.json`，提供預設路徑
+  protocol.ts              server 與 UI 之間的 payload 型別
+  frontmatter.ts           拆出 frontmatter 與正文，偵測換行符號
+  sections.ts              找段落標題、替換段落內容
+  parse.ts                 把 markdown 解析成卡片
+  scan.ts                  掃描卡片資料夾、跨檔驗證（重複 ID、懸空關聯）、讀 layout
+  edit.ts                  以最小 diff 修改欄位
+  diff.ts                  產生行差異
+  writer.ts                revision 檢查、暫存檔 + rename 寫入、配發 ID（見 MS-01）
+  owner.ts                 寫入鎖與 owner 資訊，確保同一時間只有一個寫入者
+  scope.ts                 限制讀寫路徑不能跳出專案目錄
+  init.ts                  `nodit init` 的計畫與套用
+  templates.ts             設定檔、AI 指令檔、skills、本文件的範本
+  import.ts                匯入舊版 localStorage JSON（見 ADR-002），支援中斷續跑
+server/                    CLI 與本地 API
+  cli.ts                   解析 `nodit`、`init`、`new`、`import` 指令
+  server.ts                HTTP 路由與 `dist/` 靜態檔
+  project.ts               用 chokidar 監聽檔案，維護專案快照與診斷
+  events.ts                SSE 推播，通知 UI 有檔案變動
+src/                       React UI
+  main.tsx                 進入點
+  App.tsx                  整體版面，切換 Graph Canvas 與 Architecture
+  store.ts                 zustand store（見 ADR-003），集中管理卡片、選取、主題與操作
+  data/                    與 server 溝通
+    client.ts              `ProjectClient` 介面
+    httpClient.ts          `ProjectClient` 的 HTTP 實作
+    sync.ts                SSE 同步與 revision 比對
+    drafts.ts              Inspector 的未存草稿與衝突
+  nodes/                   React Flow 的卡片節點與連線（見 ADR-001）
+  components/              Header、Sidebar、Toolbar、Inspector、Init 面板、對話框
+  architecture/            本頁：markdown、mermaid 與資料夾結構渲染
+  presentation.ts          顯示用文字與排序
+  types.ts                 UI 型別
+  hooks.ts                 共用 hooks
+  styles.css               全站樣式與主題變數
+tests/                     vitest 測試
+docs/decisions/            Nodit 自己的開發決策紀錄
+examples/demo/             開發用的 demo 專案，`npm run dev:server` 開的就是它
+index.html                 Vite 入口
+vite.config.ts             Vite 設定
 ```
-
-### core/：資料格式與寫入
-
-| 檔案 | 負責 |
-| --- | --- |
-| `domain.ts` | 卡片種類、status、關聯種類等領域常數 |
-| `config.ts` | 讀取 `nodit.config.json`，提供預設路徑 |
-| `protocol.ts` | server 與 UI 之間的 payload 型別 |
-| `frontmatter.ts`、`sections.ts`、`parse.ts` | 拆 frontmatter、找段落標題、把 markdown 解析成卡片 |
-| `scan.ts` | 掃描卡片資料夾、跨檔驗證（重複 ID、懸空關聯）、讀 `.nodit/layout.json` |
-| `edit.ts`、`diff.ts` | 以最小 diff 修改欄位，產生行差異 |
-| `writer.ts` | revision 檢查、暫存檔 + rename 的寫入流程，新建卡片與配發 ID |
-| `owner.ts` | 寫入鎖與 owner 資訊，確保同一時間只有一個寫入者 |
-| `scope.ts` | 限制讀寫路徑不能跳出專案目錄 |
-| `init.ts`、`templates.ts` | `nodit init` 的計畫與套用，以及設定檔、AI 指令檔、skills、本文件的範本 |
-| `import.ts` | 匯入舊版 localStorage JSON，支援中斷續跑 |
-
-### server/：CLI 與 API
-
-| 檔案 | 負責 |
-| --- | --- |
-| `cli.ts` | 解析 `nodit`、`init`、`new`、`import` 指令 |
-| `server.ts` | HTTP 路由（`/api/project`、`/api/cards`、`/api/architecture` 等）與 `dist/` 靜態檔 |
-| `project.ts` | 用 chokidar 監聽檔案，維護目前的專案快照與診斷 |
-| `events.ts` | SSE 推播，通知 UI 有檔案變動 |
-
-### src/：瀏覽器 UI
-
-| 位置 | 負責 |
-| --- | --- |
-| `main.tsx`、`App.tsx` | 進入點與整體版面（Graph Canvas / Architecture 切換） |
-| `store.ts` | zustand store，集中管理卡片、選取、主題與操作 |
-| `data/` | `client.ts` 定義 `ProjectClient` 介面，`httpClient.ts` 實作它，`sync.ts` 處理 SSE 同步，`drafts.ts` 管理 Inspector 的未存草稿與衝突 |
-| `nodes/` | React Flow 的卡片節點與連線 |
-| `components/` | Header、Sidebar、Toolbar、Inspector、Init 面板、對話框等 UI 元件 |
-| `architecture/` | 本頁：markdown 與 mermaid 渲染、卡片代號連結 |
-| `presentation.ts`、`types.ts`、`hooks.ts` | 顯示用文字與排序、UI 型別、共用 hooks |
-| `styles.css` | 全站樣式與主題變數 |
 
 ### 使用者專案裡的檔案
 

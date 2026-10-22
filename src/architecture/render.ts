@@ -2,7 +2,11 @@ import type { DOMPurify } from 'dompurify'
 import { Marked, type Token, type Tokens } from 'marked'
 
 export type TocEntry = { id: string; text: string; level: number }
-export type RenderedDoc = { html: string; toc: TocEntry[]; mermaid: string[] }
+export type TreeLine = { name: string; desc: string; children: TreeLine[] }
+export type TreeNode = { name: string; html: string; dir: boolean; children: TreeNode[] }
+export type RenderedDoc = { html: string; toc: TocEntry[]; mermaid: string[]; trees: TreeNode[][] }
+
+export const TREE_LANG = 'nodit-tree'
 
 const CARD_RE = /^(?:ADR-\d{3,}|MS-\d{2,}|T-\d{3,})(?![\w-])/
 const CARD_START = /(?:ADR|MS|T)-\d/
@@ -34,12 +38,33 @@ function demoteRefs(tokens: Token[] | undefined) {
 }
 
 /**
+ * `nodit-tree` source → nested nodes. Each line is `path  description`; indentation sets depth
+ * and a trailing `/` (or having children) marks a folder. Over-indented lines attach to the
+ * previous line, so a sloppy indent degrades instead of failing.
+ */
+export function parseTree(src: string): TreeLine[] {
+  const roots: TreeLine[] = []
+  const stack: { indent: number; node: TreeLine }[] = []
+  for (const line of src.split(/\r?\n/)) {
+    if (!line.trim()) continue
+    const indent = line.match(/^[ \t]*/)![0].replace(/\t/g, '  ').length
+    const [name, ...rest] = line.trim().split(/\t|\s{2,}/)
+    const node: TreeLine = { name: name!, desc: rest.join(' ').trim(), children: [] }
+    while (stack.length && stack[stack.length - 1]!.indent >= indent) stack.pop()
+    ;(stack.length ? stack[stack.length - 1]!.node.children : roots).push(node)
+    stack.push({ indent, node })
+  }
+  return roots
+}
+
+/**
  * Markdown → sanitized HTML. Card codes become links at the token level (so code spans, fenced
  * code, existing links and mermaid blocks are never touched); mermaid sources are returned
  * separately and rendered later into placeholders.
  */
 export function renderMarkdown(markdown: string, knownIds: Set<string>, purify: DOMPurify): RenderedDoc {
   const mermaid: string[] = []
+  const treeSources: string[] = []
   const toc: TocEntry[] = []
   const seen = new Map<string, number>()
 
@@ -71,6 +96,10 @@ export function renderMarkdown(markdown: string, knownIds: Set<string>, purify: 
           const i = mermaid.push(text) - 1
           return `<div class="mermaid-block" data-mermaid="${i}"></div>`
         }
+        if (lang?.trim().toLowerCase() === TREE_LANG) {
+          treeSources.push(text)
+          return '<p class="tree-ref"><a href="#structure" data-tab="structure">在 Structure 查看資料夾結構</a></p>'
+        }
         return `<pre class="code"><code>${escapeHtml(text)}</code></pre>`
       },
       heading({ tokens, depth }) {
@@ -86,13 +115,20 @@ export function renderMarkdown(markdown: string, knownIds: Set<string>, purify: 
     },
   })
 
-  const raw = marked.parse(markdown, { async: false }) as string
-  const html = purify.sanitize(raw, {
-    ADD_ATTR: ['data-card', 'data-mermaid'],
-    FORBID_TAGS: ['style', 'iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed'],
-    FORBID_ATTR: ['style'],
+  const sanitize = (raw: string) =>
+    purify.sanitize(raw, {
+      ADD_ATTR: ['data-card', 'data-mermaid', 'data-tab'],
+      FORBID_TAGS: ['style', 'iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed'],
+      FORBID_ATTR: ['style'],
+    })
+  const html = sanitize(marked.parse(markdown, { async: false }) as string)
+  const toNode = (n: TreeLine): TreeNode => ({
+    name: n.name,
+    html: n.desc ? sanitize(marked.parseInline(n.desc, { async: false }) as string) : '',
+    dir: n.name.endsWith('/') || n.children.length > 0,
+    children: n.children.map(toNode),
   })
-  return { html, toc, mermaid }
+  return { html, toc, mermaid, trees: treeSources.map((src) => parseTree(src).map(toNode)) }
 }
 
 /** Mermaid output is SVG; sanitize it with the SVG profile before inserting. */
