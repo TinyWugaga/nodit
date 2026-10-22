@@ -36,6 +36,8 @@ export class DraftManager {
   private drafts = new Map<string, Draft>()
   private timers = new Map<string, ReturnType<typeof setTimeout>>()
   private gen = 0
+  /** bumped by clear(); a response from before it belongs to another project and is dropped */
+  private epoch = 0
   private listeners = new Set<() => void>()
 
   constructor(
@@ -87,12 +89,14 @@ export class DraftManager {
     d.status = 'saving'
     this.emit()
     const fields = Object.fromEntries(Object.entries(sent).map(([k, e]) => [k, e.value]))
+    const epoch = this.epoch
     let result: MutationResult
     try {
       result = await this.send(docKey, d.base, fields)
     } catch (err) {
       result = { ok: false, reason: 'error', message: err instanceof Error ? err.message : String(err) }
     }
+    if (epoch !== this.epoch) return
     this.settle(docKey, sent, result)
   }
 
@@ -182,6 +186,19 @@ export class DraftManager {
     if (!d || d.inFlight || d.base === revision) return
     d.diskChanged = true
     this.emit()
+  }
+
+  /** Forget every draft, e.g. after switching projects: docKeys of the old project mean nothing now. */
+  clear() {
+    for (const t of this.timers.values()) clearTimeout(t)
+    this.timers.clear()
+    this.drafts.clear()
+    this.epoch++
+    this.emit()
+  }
+
+  get size() {
+    return this.drafts.size
   }
 
   has(docKey: string) {

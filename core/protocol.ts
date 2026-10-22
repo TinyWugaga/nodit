@@ -34,6 +34,8 @@ export type ProjectStatus = { initialized: boolean; components: Record<string, C
 
 export type ProjectPayload = {
   name: string
+  /** absolute path of the open project; tells a tab that the server switched projects */
+  root: string
   initialized: boolean
   config: NoditConfig
   status: ProjectStatus

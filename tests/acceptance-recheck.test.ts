@@ -13,7 +13,7 @@ async function fixture() { const p = await temp(); await cp(path.resolve('exampl
 async function serve(root: string) { const s = await start({ root, port: 0 }); servers.push(s); return s }
 async function send(s: RunningServer, method: string, p: string, body?: unknown) {
   const base = `http://127.0.0.1:${s.port}`
-  return fetch(base + p, { method, headers: { Origin: base, 'X-Nodit-Token': s.owner.token, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  return fetch(base + p, { method, headers: { Origin: base, 'X-Nodit-Token': s.owner.token,'X-Nodit-Session':s.project.sessionId, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 }
 afterEach(async () => { await Promise.all(servers.splice(0).map((s) => s.close())); await Promise.all(roots.splice(0).map((p) => rm(p, { recursive: true, force: true }))) })
 

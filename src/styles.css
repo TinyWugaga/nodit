@@ -2741,3 +2741,126 @@ button.tree__toggle {
     display: none;
   }
 }
+
+.crumbs__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.crumbs__switch:hover {
+  border-color: var(--line);
+}
+
+.modal__panel--switch {
+  width: min(880px, 100%);
+  height: min(640px, calc(100vh - 48px));
+}
+.switch-path {
+  display: flex;
+  gap: var(--sp-xs);
+}
+.switch-path .input {
+  flex: 1;
+  min-width: 0;
+}
+.switch-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.switch-error svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.switch-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--sp-md);
+  flex: 1;
+  min-height: 0;
+}
+.switch-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-height: 0;
+}
+.switch-col__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink-3);
+}
+.switch-crumb {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+.switch-crumb .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  color: var(--ink-2);
+}
+.switch-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+.switch-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-xs);
+  width: 100%;
+  padding: 6px var(--sp-xs);
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.switch-list button:hover:not(:disabled) {
+  background: var(--container);
+  color: var(--ink);
+}
+.switch-list button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.switch-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.switch-list__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: right;
+}
+.switch-empty {
+  margin: 0;
+  padding: 6px var(--sp-xs);
+}
+@media (max-width: 720px) {
+  .switch-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

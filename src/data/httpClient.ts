@@ -1,5 +1,19 @@
 import type { Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
-import type { CreateResult, DeleteResult, Failure, ImportResult, InitPlanView, InitResultView, LayoutResult, LinkChange, NewCardInput, ProjectClient, SubscribeHandlers } from './client'
+import type {
+  CreateResult,
+  DeleteResult,
+  DirListing,
+  Failure,
+  ImportResult,
+  InitPlanView,
+  InitResultView,
+  LayoutResult,
+  LinkChange,
+  NewCardInput,
+  ProjectClient,
+  RecentProjects,
+  SubscribeHandlers,
+} from './client'
 import { metaOf } from './sync'
 
 type Raw = { status: number; body: any; error?: string }
@@ -8,13 +22,14 @@ export const SECTION_PREFIX = 'section:'
 
 export class HttpProjectClient implements ProjectClient {
   connGen = 0
+  sessionId: string | null = null
   private token = document.querySelector<HTMLMetaElement>('meta[name="nodit-token"]')?.content ?? ''
 
   private async send(method: string, url: string, body?: unknown): Promise<Raw> {
     try {
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-Nodit-Token': this.token },
+        headers: { 'Content-Type': 'application/json', 'X-Nodit-Token': this.token, 'X-Nodit-Session': this.sessionId ?? '' },
         body: body === undefined ? undefined : JSON.stringify(body),
       })
       return { status: res.status, body: await res.json().catch(() => ({})) }
@@ -31,6 +46,8 @@ export class HttpProjectClient implements ProjectClient {
       return { ok: false, reason: 'invalid', message: body.diagnostics?.map((d: { message: string }) => d.message).join('；') ?? '驗證失敗', diagnostics: body.diagnostics }
     }
     if (r.status === 401 || r.status === 403) return { ok: false, reason: 'auth', message: 'Server 已重新啟動或權杖失效，重新整理頁面後才能寫入' }
+    if (r.status === 412) return { ok: false, reason: 'auth', message: body.error ?? '專案已切換，重新載入頁面後才能寫入' }
+    if (r.status === 503 && body.code === 'switching') return { ok: false, reason: 'error', message: body.error }
     if (r.status === 503) return { ok: false, reason: 'compromised', message: body.error ?? '寫入鎖已失效' }
     return { ok: false, reason: 'error', message: body.error ?? `HTTP ${r.status}` }
   }
@@ -124,6 +141,30 @@ export class HttpProjectClient implements ProjectClient {
     return this.failure(r)
   }
 
+  async listDir(path: string | null): Promise<DirListing> {
+    const r = await this.send('GET', `/api/fs/list${path ? `?path=${encodeURIComponent(path)}` : ''}`)
+    if (r.status !== 200) throw new Error(this.failure(r).message)
+    return r.body
+  }
+
+  async recentProjects(): Promise<RecentProjects> {
+    const r = await this.send('GET', '/api/projects/recent')
+    if (r.status !== 200) throw new Error(this.failure(r).message)
+    return r.body
+  }
+
+  async switchProject(path: string) {
+    const r = await this.send('POST', '/api/project/switch', { path })
+    if (r.status !== 200) {
+      const f = this.failure(r)
+      return r.body.error ? { ...f, message: r.body.error as string } : f
+    }
+    const { token, ...snapshot } = r.body as Envelope<ProjectPayload> & { token: string }
+    this.token = token
+    this.sessionId = snapshot.sessionId
+    return { ok: true as const, snapshot }
+  }
+
   /** EventSource gives up for good after a non-200 response (e.g. the proxy while the server is down), so reconnect manually. */
   subscribe(h: SubscribeHandlers) {
     let es: EventSource | null = null
@@ -148,6 +189,7 @@ export class HttpProjectClient implements ProjectClient {
       }
       es.addEventListener('hello', (e) => h.hello(JSON.parse((e as MessageEvent).data)))
       es.addEventListener('snapshot-changed', (e) => h.changed(JSON.parse((e as MessageEvent).data)))
+      es.addEventListener('project-switched', (e) => h.switched(JSON.parse((e as MessageEvent).data)))
       es.addEventListener('writer-compromised', (e) => h.compromised(JSON.parse((e as MessageEvent).data).message))
     }
 

@@ -8,7 +8,7 @@ import {start,type RunningServer} from '../server/server'
 const roots:string[]=[],ss:RunningServer[]=[]
 async function root(){const r=await mkdtemp(path.join(tmpdir(),'nodit-fe-review-'));roots.push(r);await cp(path.resolve('examples/demo'),r,{recursive:true,filter:p=>!p.includes('/.nodit/')||!/(writer\.lock|owner\.json|token)/.test(p)});return r}
 async function server(r:string){const s=await start({root:r,port:0});ss.push(s);return s}
-async function send(s:RunningServer,method:string,p:string,body?:unknown){const base=`http://127.0.0.1:${s.port}`;return fetch(base+p,{method,headers:{Origin:base,'X-Nodit-Token':s.owner.token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)})}
+async function send(s:RunningServer,method:string,p:string,body?:unknown){const base=`http://127.0.0.1:${s.port}`;return fetch(base+p,{method,headers:{Origin:base,'X-Nodit-Token':s.owner.token,'X-Nodit-Session':s.project.sessionId,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)})}
 afterEach(async()=>{await Promise.all(ss.splice(0).map(s=>s.close()));await Promise.all(roots.splice(0).map(r=>rm(r,{recursive:true,force:true})))})
 it('V01 unreadable config keeps the previously accepted custom task directory',async()=>{
  const r=await root(),file=path.join(r,'nodit.config.json'),cfg=JSON.parse(await readFile(file,'utf8'));await rename(path.join(r,'docs/tasks'),path.join(r,'work'));cfg.paths.task='work';await writeFile(file,JSON.stringify(cfg));const s=await server(r);await chmod(file,0o000);

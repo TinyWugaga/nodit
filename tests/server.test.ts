@@ -38,7 +38,7 @@ function doc(p: Envelope<ProjectPayload>, rel: string): ClientDoc {
 function patch(docKey: string, body: unknown, headers: Record<string, string> = {}) {
   return fetch(`${base}/api/docs/${docKey}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Origin: origin(), 'X-Nodit-Token': srv.owner.token, ...headers },
+    headers: { 'Content-Type': 'application/json', Origin: origin(), 'X-Nodit-Token': srv.owner.token,'X-Nodit-Session':srv.project.sessionId, ...headers },
     body: JSON.stringify(body),
   })
 }
@@ -136,7 +136,7 @@ describe('server', () => {
 
   it('step 2 routes: create, links, raw 422, delete 409, token required', async () => {
     const send = (method: string, url: string, body: unknown, token = srv.owner.token) =>
-      fetch(`${base}${url}`, { method, headers: { 'Content-Type': 'application/json', Origin: origin(), 'X-Nodit-Token': token }, body: JSON.stringify(body) })
+      fetch(`${base}${url}`, { method, headers: { 'Content-Type': 'application/json', Origin: origin(), 'X-Nodit-Token': token, 'X-Nodit-Session': srv.project.sessionId }, body: JSON.stringify(body) })
 
     expect((await send('POST', '/api/cards', { type: 'task', title: 'x' }, 'bad')).status).toBe(401)
     const created = await send('POST', '/api/cards', { type: 'task', title: 'Route test', links: [{ rel: 'part-of', to: 'MS-01' }] })

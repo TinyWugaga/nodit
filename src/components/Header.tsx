@@ -1,4 +1,4 @@
-import { Archive, Download, Search, Upload, X } from 'lucide-react'
+import { Archive, ChevronDown, Download, Search, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { LEGACY_STORAGE_KEY, useProject } from '../store'
@@ -20,8 +20,16 @@ function readLegacy() {
 }
 
 export function Header() {
-  const { projectName, query, setQuery, view, setView, importLegacy } = useProject(
-    useShallow((s) => ({ projectName: s.projectName, query: s.query, setQuery: s.setQuery, view: s.view, setView: s.setView, importLegacy: s.importLegacy })),
+  const { projectName, query, setQuery, view, setView, importLegacy, setSwitcherOpen } = useProject(
+    useShallow((s) => ({
+      projectName: s.projectName,
+      query: s.query,
+      setQuery: s.setQuery,
+      view: s.view,
+      setView: s.setView,
+      importLegacy: s.importLegacy,
+      setSwitcherOpen: s.setSwitcherOpen,
+    })),
   )
   const searchRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -61,7 +69,10 @@ export function Header() {
       <div className="crumbs mono">
         <span>Workspace</span>
         <span className="crumbs__sep">/</span>
-        <span className="crumbs__project">{projectName || '…'}</span>
+        <button type="button" className="crumbs__project crumbs__switch" title="切換到另一個本地專案" onClick={() => setSwitcherOpen(true)}>
+          {projectName || '…'}
+          <ChevronDown size={13} />
+        </button>
         <span className="crumbs__sep">/</span>
         <span className="view-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={view === 'graph'} className={view === 'graph' ? 'is-active' : ''} onClick={() => setView('graph')}>
