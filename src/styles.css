@@ -38,7 +38,7 @@
   --line-soft: rgb(85 74 80 / 0.6);
   --ink: #f7ede9;
   --ink-2: #dcc7c9;
-  --ink-3: #ab969c;
+  --ink-3: #bba6ad;
   --on-k: #241f22;
   --accent: var(--rose);
   --accent-hover: var(--blush);
@@ -76,8 +76,8 @@
   --line-soft: rgb(230 218 216 / 0.8);
   --ink: #2d2427;
   --ink-2: #6d5c63;
-  --ink-3: #9d8189;
-  --accent-text: #b4566a;
+  --ink-3: #79646c;
+  --accent-text: #a34459;
   --on-accent: #2d2427;
   --grid-dot: #e0d2d2;
   --grid-line: rgb(157 129 137 / 0.08);
@@ -297,7 +297,7 @@ kbd {
   border: 1px solid transparent;
   border-radius: var(--r);
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: left;
   transition: background 0.15s, color 0.15s;
 }
@@ -1894,7 +1894,7 @@ button.link-row:hover {
 }
 .diag svg {
   margin-top: 2px;
-  color: var(--peach);
+  color: var(--accent-text);
 }
 .diag--error svg {
   color: var(--accent);
@@ -2863,4 +2863,8 @@ button.tree__toggle {
   .switch-body {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.tasks__summary h3 {
+  color: var(--ink-2);
 }
