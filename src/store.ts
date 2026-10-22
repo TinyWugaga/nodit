@@ -87,8 +87,8 @@ type State = {
   /** remounts the canvas so a newly opened project gets fitted from scratch */
   canvasEpoch: number
 
-  view: 'graph' | 'architecture'
-  setView: (view: 'graph' | 'architecture') => void
+  view: 'graph' | 'architecture' | 'tasks'
+  setView: (view: 'graph' | 'architecture' | 'tasks') => void
   architecture: { path: string; revision: string }
   /** docKey to focus once the canvas is mounted (e.g. after clicking a card ref on the architecture page) */
   pendingFocus: string | null

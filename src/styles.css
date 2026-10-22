@@ -2868,3 +2868,202 @@ button.tree__toggle {
 .tasks__summary h3 {
   color: var(--ink-2);
 }
+
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  height: 100%;
+  padding: var(--sp-lg);
+  overflow: auto;
+}
+.stage:has(.inspector) .tasks {
+  padding-right: calc(var(--drawer-w) + var(--sp-lg));
+}
+.tasks__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+.tasks__note {
+  font-size: 12px;
+}
+.tasks__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-md);
+}
+.tasks__summary section {
+  padding: var(--sp-sm) var(--sp-md);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--low);
+}
+.tasks__summary h3 {
+  margin: 0 0 var(--sp-xs);
+}
+.tasks__summary ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tasks__summary li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 2px 0;
+  font-size: 13px;
+}
+.tasks__summary p {
+  margin: 0;
+  font-size: 13px;
+}
+.tasks__summary-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+.tasks__empty {
+  margin: var(--sp-xl) auto;
+}
+.tasks__board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-lg);
+}
+.tasks__lane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-xs);
+  padding-bottom: var(--sp-xs);
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-head);
+  font-weight: 500;
+  color: var(--ink);
+}
+.tasks__lane-head .muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+.tasks__columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  gap: var(--sp-sm);
+}
+.tasks__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-height: 72px;
+  padding: var(--sp-xs);
+  border: 1px dashed transparent;
+  border-radius: var(--r);
+  background: var(--lowest);
+  transition: border-color 0.15s, background 0.15s;
+}
+.tasks__col[data-drop='ok'] {
+  border-color: var(--line);
+}
+.tasks__col[data-drop='over'] {
+  border-color: var(--accent);
+  background: var(--low);
+}
+.tasks__col[data-drop='no'] {
+  opacity: 0.55;
+}
+.tasks__col-head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 2px var(--sp-xs);
+  color: var(--ink-3);
+}
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--sp-sm);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--kind-task);
+  border-radius: var(--r);
+  background: var(--container);
+  cursor: pointer;
+}
+.task-card[draggable='true'] {
+  cursor: grab;
+}
+.task-card:hover {
+  border-color: var(--line);
+  border-left-color: var(--kind-task);
+}
+.task-card:focus-visible,
+.task-card.is-selected {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+.task-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.task-card[data-priority='high'] .task-card__priority {
+  color: var(--accent-text);
+}
+.task-card__title {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.task-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-sm);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.task-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.task-card__hints {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+.task-card__hints li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.task-card__hints li[data-kind='unfinished'] {
+  color: var(--ink-2);
+}
+.task-card__hints li[data-kind='unresolved'] {
+  color: var(--accent-text);
+}
+.task-card__sync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+}
+.task-card__sync .sync-chip {
+  font-size: 10px;
+}
+.task-card__fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--accent-text);
+}

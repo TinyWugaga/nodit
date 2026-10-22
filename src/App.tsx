@@ -15,6 +15,7 @@ import { LinkEdgeView, LinkMarkers } from './nodes/LinkEdgeView'
 import { useProject } from './store'
 import type { CardNode } from './types'
 
+const TasksPage = lazy(() => import('./tasks/TasksPage').then((m) => ({ default: m.TasksPage })))
 const ArchitecturePage = lazy(() => import('./architecture/ArchitecturePage').then((m) => ({ default: m.ArchitecturePage })))
 
 const nodeTypes = { card: CardNodeView }
@@ -172,6 +173,11 @@ export default function App() {
                 <Toolbar />
                 <Inspector />
               </>
+            ) : view === 'tasks' ? (
+              <Suspense fallback={null}>
+                <TasksPage />
+                <Inspector />
+              </Suspense>
             ) : (
               <Suspense fallback={null}>
                 <ArchitecturePage />

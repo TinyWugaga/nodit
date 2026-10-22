@@ -268,7 +268,7 @@ const SYNC_LABEL: Record<DraftView['status'] | 'saved', string> = {
   auth: 'Read-only',
 }
 
-function SyncChip({ draft, writable }: { draft?: DraftView; writable: boolean }) {
+export function SyncChip({ draft, writable }: { draft?: DraftView; writable: boolean }) {
   const state = draft?.status ?? 'saved'
   return (
     <span className="sync-chip mono" data-state={writable ? state : 'locked'}>

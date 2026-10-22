@@ -87,6 +87,9 @@ export function Header() {
           >
             Architecture
           </button>
+          <button type="button" role="tab" aria-selected={view === 'tasks'} className={view === 'tasks' ? 'is-active' : ''} onClick={() => setView('tasks')}>
+            Tasks
+          </button>
         </span>
       </div>
 
