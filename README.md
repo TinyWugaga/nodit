@@ -160,6 +160,7 @@ NODIT_PROJECT=../my-project npm run dev
 | `npm test` | vitest：解析與寫入保真度、寫入鎖與併發、init、server 安全邊界、XSS |
 | `npm run typecheck` | TypeScript 型別檢查 |
 | `npm run build` | 型別檢查 + 產生 `dist/` 與 `dist-server/` |
+| `npx tsx scripts/release-tag.ts v<版本號>` | 檢查 tag 是否可以發佈（CI 發佈前也會跑） |
 
 ```
 core/      domain、解析、最小 diff 編輯、寫入佇列、寫入鎖、init、模板
@@ -172,13 +173,37 @@ docs/      本專案自己的決策紀錄
 
 ### 發佈
 
-`npm pack` 與 `npm publish` 會先經由 `prepack` 跑 `npm run build`。套件只包含 `bin/`、`dist/`、`dist-server/`；執行期依賴只有 `chokidar`、`proper-lockfile`、`yaml`，UI 用到的套件都已打包進 `dist/`。
+推送 `v<版本號>` 格式的 tag，就會觸發 `.github/workflows/publish.yml` 自動發佈到 npm。CI 透過 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) 以 GitHub OIDC 驗證，GitHub 上不存放 npm token，provenance 也會自動產生。
+
+1. 開一個 PR 升版號（不建立 tag），merge 進 `main`：
+
+   ```bash
+   npm version patch --no-git-tag-version
+   ```
+
+2. 在 `main` 的最新 commit 上打 tag 並推送：
+
+   ```bash
+   git checkout main && git pull
+   git tag v0.1.1
+   git push origin v0.1.1
+   ```
+
+CI 會依序檢查以下條件，任何一項不符合就停止，不會發佈：
+
+- tag 是 `v` 加上合法的 semver，例如 `v1.2.3`、`v1.2.3-beta.1`；不接受 `+build` metadata。
+- tag 的版本號等於 `package.json` 的 `version`。
+- tag 指向的 commit 在 `main` 上。
+- 正式版要比 npm 上目前的 `latest` 新。
+- `npm run typecheck` 與 `npm test` 都通過。
+
+正式版以 `latest` 發佈。預發佈版以第一個識別字當 dist-tag，例如 `v1.0.0-beta.1` 發成 `beta`，所以不會影響一般使用者安裝到的版本。
+
+`npm pack` 與 `npm publish` 會先經由 `prepack` 跑 `npm run build`。套件只包含 `bin/`、`dist/`、`dist-server/`；執行期依賴只有 `chokidar`、`proper-lockfile`、`yaml`，UI 用到的套件都已打包進 `dist/`。發佈前可以先看檔案清單：
 
 ```bash
 npm pack --dry-run
 ```
-
-確認檔案清單後再執行 `npm publish`。scope `@tinywugaga` 必須是發佈者的 npm 帳號或 organization。
 
 ## 授權
 
