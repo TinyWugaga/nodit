@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Frame, StatusDots } from './components/Frame'
 import { Header } from './components/Header'
+import { HelpPanel } from './components/HelpPanel'
 import { InitPanel } from './components/InitPanel'
 import { DeleteDialog, RawEditor, Toast } from './components/Overlays'
 import { ProjectSwitcher, SwitchedAway } from './components/ProjectSwitcher'
@@ -193,6 +194,7 @@ export default function App() {
       <InitPanel />
       <ProjectSwitcher />
       <SwitchedAway />
+      <HelpPanel />
       <LinkMarkers />
     </ReactFlowProvider>
   )

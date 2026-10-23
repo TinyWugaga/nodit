@@ -1,4 +1,4 @@
-import { Archive, ChevronDown, Download, Search, Upload, X } from 'lucide-react'
+import { Archive, ChevronDown, CircleHelp, Download, Search, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { LEGACY_STORAGE_KEY, useProject } from '../store'
@@ -20,7 +20,7 @@ function readLegacy() {
 }
 
 export function Header() {
-  const { projectName, query, setQuery, view, setView, importLegacy, setSwitcherOpen } = useProject(
+  const { projectName, query, setQuery, view, setView, importLegacy, setSwitcherOpen, setHelpOpen } = useProject(
     useShallow((s) => ({
       projectName: s.projectName,
       query: s.query,
@@ -29,6 +29,7 @@ export function Header() {
       setView: s.setView,
       importLegacy: s.importLegacy,
       setSwitcherOpen: s.setSwitcherOpen,
+      setHelpOpen: s.setHelpOpen,
     })),
   )
   const searchRef = useRef<HTMLInputElement>(null)
@@ -142,6 +143,10 @@ export function Header() {
             </button>
           )}
         </div>
+
+        <button type="button" className="icon-btn" title="說明手冊（?）" aria-label="開啟說明手冊" onClick={() => setHelpOpen(true)}>
+          <CircleHelp size={16} />
+        </button>
       </div>
     </header>
   )

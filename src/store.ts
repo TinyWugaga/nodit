@@ -79,6 +79,8 @@ type State = {
 
   switcherOpen: boolean
   setSwitcherOpen: (open: boolean) => void
+  helpOpen: boolean
+  setHelpOpen: (open: boolean) => void
   /** another tab switched the server to this project; this tab stopped syncing and writing */
   switchedAway?: { name: string }
   /** resolves with an error message, or null once the new project is loaded */
@@ -563,6 +565,8 @@ export const useProject = create<State>()(
 
         switcherOpen: false,
         setSwitcherOpen: (switcherOpen) => set({ switcherOpen }),
+        helpOpen: false,
+        setHelpOpen: (helpOpen) => set({ helpOpen }),
         canvasEpoch: 0,
         unsavedDrafts: () => drafts.size + Object.keys(pendingLayout).length,
         switchProject: async (target) => {
