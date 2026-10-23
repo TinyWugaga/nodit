@@ -297,7 +297,7 @@ const SECTIONS: Section[] = [
     body: () => (
       <>
         <p>
-          init 寫入的 AGENTS.md、CLAUDE.md 區塊與 <C>.claude/skills</C>（nodit-adr、nodit-milestone、nodit-task）會教 AI 照 Nodit 的格式寫卡片。已開著的 AI
+          init 寫入的 AGENTS.md、CLAUDE.md 區塊與 <C>.claude/skills</C>（nodit-adr、nodit-milestone、nodit-task、nodit-architecture）會教 AI 照 Nodit 的格式寫卡片與架構文件。已開著的 AI
           工作階段要重開才會載入。
         </p>
         <p>建卡片建議讓 AI 用 CLI，由 Nodit 配發不重複的編號：</p>

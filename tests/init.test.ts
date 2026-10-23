@@ -2,11 +2,11 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { loadConfig } from '../core/config'
+import { DEFAULT_PATHS, loadConfig } from '../core/config'
 import { applyInit, initPaths, planInit, scopedRead, type InitPlan } from '../core/init'
 import { acquireOwner, type Owner } from '../core/owner'
 import { sha1 } from '../core/parse'
-import { BLOCK_END, renderAgentsBlock, TEMPLATE_VERSION } from '../core/templates'
+import { BLOCK_END, renderAgentsBlock, renderClaudeBlock, renderSkill, TEMPLATE_VERSION } from '../core/templates'
 import { ValidationError, Writer } from '../core/writer'
 
 let root: string
@@ -54,6 +54,7 @@ describe('init', () => {
     const config = JSON.parse(await read('nodit.config.json'))
     expect(Object.keys(config.managed).sort()).toEqual([
       '.claude/skills/nodit-adr/SKILL.md',
+      '.claude/skills/nodit-architecture/SKILL.md',
       '.claude/skills/nodit-milestone/SKILL.md',
       '.claude/skills/nodit-task/SKILL.md',
       'AGENTS.md#nodit',
@@ -120,7 +121,7 @@ describe('init', () => {
     const p = await plan()
     expect(action(p, 'AGENTS.md#nodit')).toBe('skip')
     await applyInit(writer, p, applicable(p))
-    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(5)
+    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(6)
   })
 
   it('does not overwrite a file that appeared between preview and apply', async () => {
@@ -142,6 +143,50 @@ describe('init', () => {
     expect(await exists('AGENTS.md')).toBe(false)
     expect(await exists('.claude')).toBe(false)
     expect(await exists('nodit.config.json')).toBe(true)
+  })
+
+  it('teaches AI how to maintain the architecture document', async () => {
+    await run()
+    const skill = await read('.claude/skills/nodit-architecture/SKILL.md')
+    expect(skill).toMatch(/^---\nname: nodit-architecture\ndescription: .+\n# nodit-managed v\d+\n---\n/)
+    expect(skill).toContain('`docs/ARCHITECTURE.md`')
+    expect(skill).toContain('```nodit-tree')
+    expect(skill).toContain('````markdown')
+    for (const file of ['AGENTS.md', 'CLAUDE.md']) {
+      const text = await read(file)
+      expect(text).toContain('### Architecture 文件')
+      expect(text).toContain('`docs/ARCHITECTURE.md`')
+      expect(text).toContain('`nodit-tree`')
+    }
+    expect(await read('CLAUDE.md')).toContain('`/nodit-architecture`')
+    expect(await read('AGENTS.md')).not.toContain('/nodit-architecture')
+  })
+
+  it('renders the configured architecture path into the rules and skill', async () => {
+    const { config } = await loadConfig(root)
+    const custom = { ...config, paths: { ...DEFAULT_PATHS, architecture: 'design/SYSTEM.md', adr: 'design/adr' } }
+    for (const text of [renderAgentsBlock(custom), renderClaudeBlock(custom), renderSkill('architecture', custom)]) {
+      expect(text).toContain('`design/SYSTEM.md`')
+      expect(text).not.toContain('docs/ARCHITECTURE.md')
+    }
+    expect(renderSkill('architecture', custom)).toContain('`design/adr/`')
+  })
+
+  it('adds the architecture skill to a project initialized before it existed', async () => {
+    await run()
+    const skill = '.claude/skills/nodit-architecture/SKILL.md'
+    await rm(path.join(root, '.claude/skills/nodit-architecture'), { recursive: true })
+    const cfg = JSON.parse(await read('nodit.config.json'))
+    delete cfg.managed[skill]
+    await writeFile(path.join(root, 'nodit.config.json'), JSON.stringify(cfg, null, 2) + '\n')
+    const p = await plan()
+    expect(action(p, skill)).toBe('create')
+    expect(action(p, 'AGENTS.md#nodit')).toBe('skip')
+    expect(action(p, 'nodit.config.json')).toBe('upgrade')
+    const results = await applyInit(writer, p, applicable(p))
+    expect(results.every((r) => r.ok)).toBe(true)
+    expect(await exists(skill)).toBe(true)
+    expect(JSON.parse(await read('nodit.config.json')).managed[skill].hash).toBe(sha1(await read(skill)))
   })
 
   it('treats malformed markers and foreign skill files as conflicts', async () => {
