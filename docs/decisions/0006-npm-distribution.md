@@ -45,10 +45,24 @@
 - **dist-tag**：正式版用 `latest`；預發佈版用第一個識別字，例如 `beta`、`rc`，識別字以數字開頭時用 `next`。
 - **npm 版本**：CI 固定安裝 npm 12.2.1，避開 12.0.0 缺少 `sigstore` 的問題。
 
+### 首次 CI 發佈（2026-10-23）
+
+`0.1.1` 是第一個由 tag workflow 發佈的版本，驗證了上面整條流程：
+
+- tag `v0.1.1` 指向 `main` 的 `4e490ac`。[run 39930158029](https://github.com/TinyWugaga/nodit/actions/runs/39930158029) 的每個步驟都通過，tag 檢查輸出 `@tinywugaga/nodit@0.1.1 → dist-tag latest`。
+- registry 上 `0.1.1` 的發佈者是 `GitHub Actions`（trusted publisher），整個過程沒有用到 npm token。
+- 附有 SLSA v1 provenance，已寫入 [Sigstore transparency log](https://search.sigstore.dev/?logIndex=3415907431)。內容記錄的來源：
+  - repo：`TinyWugaga/nodit`
+  - ref：`refs/tags/v0.1.1`
+  - commit：`4e490ac`
+  - workflow：`.github/workflows/publish.yml`
+  - builder：GitHub-hosted runner
+- 從 registry 安裝後，`npm audit signatures` 顯示簽章與 attestation 都驗證通過。
+
 ## 尚未處理
 
 - changelog 流程未定。
-- npmjs.com 的 trusted publisher 要由帳號持有人設定。確認 CI 能發佈後，建議在套件設定裡改成「Require two-factor authentication and disallow tokens」。
+- 建議在 npm 套件設定的 Publishing access 改成「Require two-factor authentication and disallow tokens」，讓 token 無法發佈，只留 CI 的 OIDC 與經過 2FA 的手動發佈。
 
 ## 後果
 
