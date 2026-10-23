@@ -19,11 +19,11 @@
   - 打包後的 `cli.mjs` 用 `../dist` 找 UI，和原始碼位置的相對關係相同。
   - 開發與測試照舊用 tsx 直接跑 `server/cli.ts`。
 - **套件內容**：`files` 只放 `bin/`、`dist/`、`dist-server/`。`dependencies` 只留執行期需要的 `chokidar`、`proper-lockfile`、`yaml`；React、xyflow、mermaid 等已經打包進 `dist/`，移到 devDependencies。`prepack` 會跑 `npm run build`，確保發佈的是最新產物。
+- **授權**：MIT（2026-10-23 決定），`LICENSE` 放在 repo 根目錄，npm 會自動把它打包進套件。
 - **npx 規則**：AI 模板改成「專案把 Nodit 裝成 devDependency 時用 `npx --no nodit`；不要用不帶 `--no` 的 npx」。`--no` 在本地找不到套件時會中止，不會下載（npm 12.0.0 實測：`npx --no cowsay` 回報 `npx canceled due to missing packages and no YES option`）。`TEMPLATE_VERSION` 升為 2，已 init 的專案會在 init 面板看到 Update。
 
 ## 尚未處理
 
-- 沒有 LICENSE，發佈前要決定授權。
 - 發佈方式（手動或 CI 帶 provenance）、版本與 changelog 流程未定。
 
 ## 後果

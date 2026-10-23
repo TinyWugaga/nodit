@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "把專案 docs/ 裡的 ADR、Milestone、Task 畫成可編輯關聯圖的本地工具",
+  "license": "MIT",
   "homepage": "https://github.com/TinyWugaga/nodit#readme",
   "repository": {
     "type": "git",

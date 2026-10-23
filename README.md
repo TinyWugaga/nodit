@@ -179,3 +179,7 @@ npm pack --dry-run
 ```
 
 確認檔案清單後再執行 `npm publish`。scope `@tinywugaga` 必須是發佈者的 npm 帳號或 organization。
+
+## 授權
+
+[MIT](LICENSE)
