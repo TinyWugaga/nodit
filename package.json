@@ -1,6 +1,6 @@
 {
   "name": "@tinywugaga/nodit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "把專案 docs/ 裡的 ADR、Milestone、Task 畫成可編輯關聯圖的本地工具",
   "license": "MIT",
