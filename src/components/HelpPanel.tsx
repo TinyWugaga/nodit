@@ -72,14 +72,18 @@ const SECTIONS: Section[] = [
     title: '安裝',
     body: () => (
       <>
-        <p>需要 Node.js 22.22 以上。Nodit 沒有發布到 npm，要從原始碼安裝：</p>
-        <Cmd>{'npm install\nnpm run build\nnpm link'}</Cmd>
         <p>
-          <C>npm link</C> 會建立全域的 <C>nodit</C> 指令。之後在任何目錄執行 <C>nodit</C>，打開 http://127.0.0.1:4319 即可。
+          需要 Node.js 22.22 以上。套件名稱是 <C>@tinywugaga/nodit</C>，安裝後的指令是 <C>nodit</C>：
         </p>
+        <Cmd>npm install -g @tinywugaga/nodit</Cmd>
+        <p>也可以裝成專案的 devDependency，讓整個團隊用同一個版本：</p>
+        <Cmd>{'npm install -D @tinywugaga/nodit\nnpx --no nodit'}</Cmd>
         <Note>
-          不要用 <C>npx nodit</C>：npm 上的同名套件不是這個專案。
+          用 npx 時一律加 <C>--no</C>：它只執行專案裡已安裝的版本。不加的話，本地找不到時 npx 會從 npm 下載套件來執行。
         </Note>
+        <p>
+          開發 Nodit 本身時，從原始碼安裝：<C>npm install</C>、<C>npm run build</C>、<C>npm link</C>。
+        </p>
       </>
     ),
   },
@@ -188,7 +192,7 @@ const SECTIONS: Section[] = [
             寫入鎖與 token（<C>.nodit/writer.lock</C>、<C>owner.json</C>、<C>token</C>）是本地狀態，init 已把它們加進 <C>.gitignore</C>。
           </li>
           <li>
-            AI 指令檔已在 repo 裡。用 AI 前先確認本機有 <C>nodit</C> 指令（見「安裝」），skills 會呼叫它。
+            AI 指令檔已在 repo 裡。用 AI 前先確認本機有 <C>nodit</C> 指令，或 repo 已把 Nodit 裝成 devDependency（見「安裝」），skills 會呼叫它。
           </li>
           <li>
             init 面板若出現 <b>Update</b> 項目，代表 repo 的 AI 指令檔是舊版模板，套用即可升級；手動改過的檔案會列為 Conflict 並保留。

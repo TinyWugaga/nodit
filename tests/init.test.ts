@@ -73,7 +73,7 @@ describe('init', () => {
     const { plan: p } = await run()
     expect(action(p, 'AGENTS.md#nodit')).toBe('append')
     const text = await read('AGENTS.md')
-    expect(text.startsWith('# Team rules\n\nUse pnpm.\n\n<!-- nodit:start v1 -->')).toBe(true)
+    expect(text.startsWith(`# Team rules\n\nUse pnpm.\n\n<!-- nodit:start v${TEMPLATE_VERSION} -->`)).toBe(true)
     expect(text).not.toContain('@AGENTS.md')
     expect(await read('CLAUDE.md')).not.toContain('@AGENTS.md')
   })

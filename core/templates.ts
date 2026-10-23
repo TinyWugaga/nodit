@@ -1,14 +1,14 @@
 import type { NoditConfig } from './config'
 import { STATUSES } from './domain'
 
-export const TEMPLATE_VERSION = 1
+export const TEMPLATE_VERSION = 2
 
 export const BLOCK_START = (v: number) => `<!-- nodit:start v${v} -->`
 export const BLOCK_END = '<!-- nodit:end -->'
 export const BLOCK_START_RE = /<!-- nodit:start v(\d+) -->/g
 
 const CLI_NOTE = [
-  '新建卡片時，先確認 `nodit` 指令可用（`command -v nodit`），可用就執行 `nodit new`，它會在寫入鎖內配發不重複的編號：',
+  '新建卡片時，先確認 `nodit` 指令可用（`command -v nodit`；專案把 Nodit 裝成 devDependency 時改用 `npx --no nodit`），可用就執行 `nodit new`，它會在寫入鎖內配發不重複的編號：',
   '',
   '```sh',
   'nodit new adr "<標題>" [--supersedes ADR-002]',
@@ -16,7 +16,7 @@ const CLI_NOTE = [
   'nodit new task "<標題>" [--milestone MS-01] [--implements ADR-001] [--depends T-002]',
   '```',
   '',
-  '不要用 `npx nodit`：Nodit 沒有發布到 npm，npx 可能下載到不相干的同名套件。`nodit` 不可用時才手寫檔案，編號取該資料夾現有最大值 + 1。',
+  '不要用不帶 `--no` 的 `npx`：本地找不到時，npx 會從 npm 下載套件來執行，下載到的不一定是這個專案用的版本或套件。`nodit` 不可用時才手寫檔案，編號取該資料夾現有最大值 + 1。',
 ]
 
 /** Shared format rules. Rendered separately into each agent file; never imported across files. */
@@ -130,8 +130,8 @@ export function renderSkill(kind: SkillKind, config: NoditConfig) {
     '',
     `# 新增或修改${s.title}（Nodit 格式）`,
     '',
-    `1. 先確認 \`nodit\` 指令可用（\`command -v nodit\`）。可用就執行 \`${s.command}\`，它會印出新卡片的 ID 與路徑。`,
-    `   - 不要用 \`npx nodit\`。指令不可用時，列出 \`${dir}/\` 取最大編號 + 1，照下面的格式手寫。`,
+    `1. 先確認 \`nodit\` 指令可用（\`command -v nodit\`；專案把 Nodit 裝成 devDependency 時改用 \`npx --no nodit\`）。可用就執行 \`${s.command}\`，它會印出新卡片的 ID 與路徑。`,
+    `   - 不要用不帶 \`--no\` 的 \`npx\`，它可能從 npm 下載別的套件。指令不可用時，列出 \`${dir}/\` 取最大編號 + 1，照下面的格式手寫。`,
     ...s.extra.map((x) => `   - ${x}`),
     `2. 打開新檔案，填寫段落：${s.sections.map((x) => `\`## ${x}\``).join('、')}。每個標題只出現一次。`,
     '3. 不要修改 `id`；frontmatter 裡不認得的欄位保持原樣。',
