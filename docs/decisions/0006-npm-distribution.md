@@ -29,9 +29,26 @@
 - npm 要求帳號開 2FA，或使用可略過 2FA 的 granular access token，才能 publish；沒有時回 403。
 - 上傳成功後 registry 回 202，需要幾分鐘處理才查得到；處理期間 `npm search` 會顯示 `0.0.0-stage` 暫存佔位版本。
 
+## 自動發佈（2026-10-23）
+
+推送 `v<semver>` tag 時，`.github/workflows/publish.yml` 會發佈對應的版本。
+
+- **驗證方式**：npm trusted publishing（GitHub OIDC），不使用長期 token。依 [npm 官方文件](https://docs.npmjs.com/trusted-publishers)（2026-10-23 查閱）：
+  - 需要 npm ≥ 11.5.1、Node ≥ 22.14.0、job 權限 `id-token: write`，而且只支援 GitHub-hosted runner。
+  - repo 與套件都公開時會自動產生 provenance。
+  - npmjs.com 上的 trusted publisher 設定預設只允許 `npm stage publish`，要另外允許 `npm publish`。
+- **版本號來源是 `package.json`**：tag 必須等於 `version`，CI 不從 tag 反推版本，避免 repo 裡的版本號和 npm 上的不一致。升版用 PR 改 `package.json`，merge 後在 `main` 上打 tag。
+- **發佈前檢查**（`scripts/release-tag.ts`）：
+  - tag 必須是合法的 semver，而且不能帶 `+build`，因為 npm 會丟掉 build metadata，兩個 tag 可能發成同一個版本。
+  - tag 指向的 commit 必須在 `main` 上。
+  - 正式版必須比目前的 `latest` 新，避免打錯 tag 讓 `latest` 倒退。
+- **dist-tag**：正式版用 `latest`；預發佈版用第一個識別字，例如 `beta`、`rc`，識別字以數字開頭時用 `next`。
+- **npm 版本**：CI 固定安裝 npm 12.2.1，避開 12.0.0 缺少 `sigstore` 的問題。
+
 ## 尚未處理
 
-- 發佈方式（目前手動；改用 CI 帶 provenance 需要 granular token 或 trusted publishing）、版本與 changelog 流程未定。
+- changelog 流程未定。
+- npmjs.com 的 trusted publisher 要由帳號持有人設定。確認 CI 能發佈後，建議在套件設定裡改成「Require two-factor authentication and disallow tokens」。
 
 ## 後果
 
