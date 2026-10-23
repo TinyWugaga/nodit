@@ -1,6 +1,6 @@
 # 0006 — 以 npm 套件發佈 Nodit
 
-- 狀態：Proposed（發佈前準備已完成，尚未實際發佈）
+- 狀態：Accepted（2026-10-23 發佈 `@tinywugaga/nodit@0.1.0`；Proposed 同日）
 - 日期：2026-10-23
 - 取代：0003「影響」中「`nodit` 沒有發布到 npm，要用 `npm link` 安裝」與「禁止使用 `npx nodit`」的部分
 
@@ -22,9 +22,16 @@
 - **授權**：MIT（2026-10-23 決定），`LICENSE` 放在 repo 根目錄，npm 會自動把它打包進套件。
 - **npx 規則**：AI 模板改成「專案把 Nodit 裝成 devDependency 時用 `npx --no nodit`；不要用不帶 `--no` 的 npx」。`--no` 在本地找不到套件時會中止，不會下載（npm 12.0.0 實測：`npx --no cowsay` 回報 `npx canceled due to missing packages and no YES option`）。`TEMPLATE_VERSION` 升為 2，已 init 的專案會在 init 面板看到 Update。
 
+## 首次發佈（2026-10-23）
+
+- `0.1.0` 由帳號持有人在 `main` 的 `92c26fd` 手動執行 `npm publish --access public --tag latest`，2FA 以網頁驗證完成。
+- npm 12.0.0 無法 publish：它的 tarball 漏打包 `sigstore`，`libnpmpublish` 載入時回報 `Cannot find module 'sigstore'`。npm 12.2.1 已修正，發佈前要確認 npm 版本不是 12.0.0。
+- npm 要求帳號開 2FA，或使用可略過 2FA 的 granular access token，才能 publish；沒有時回 403。
+- 上傳成功後 registry 回 202，需要幾分鐘處理才查得到；處理期間 `npm search` 會顯示 `0.0.0-stage` 暫存佔位版本。
+
 ## 尚未處理
 
-- 發佈方式（手動或 CI 帶 provenance）、版本與 changelog 流程未定。
+- 發佈方式（目前手動；改用 CI 帶 provenance 需要 granular token 或 trusted publishing）、版本與 changelog 流程未定。
 
 ## 後果
 
