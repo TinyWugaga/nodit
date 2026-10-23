@@ -10,7 +10,7 @@ import type { ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatu
 import { crossValidate, readLayout, scanDocs, TMP_MARK, type LayoutFile } from '../core/scan'
 import { resolveReadable } from '../core/scope'
 import { findBlock } from '../core/init'
-import { skillPath } from '../core/templates'
+import { SKILL_KINDS, skillPath } from '../core/templates'
 
 export type ChangeEvent = Envelope<{ changed: string[] }>
 
@@ -279,7 +279,7 @@ export class ProjectService extends EventEmitter {
   }
 }
 
-const AI_PATHS = ['AGENTS.md', 'CLAUDE.md', ...(['adr', 'milestone', 'task'] as const).map(skillPath)]
+const AI_PATHS = ['AGENTS.md', 'CLAUDE.md', ...SKILL_KINDS.map(skillPath)]
 
 export const CROSS_CODES = ['id-duplicate', 'link-dangling', 'supersede-status']
 

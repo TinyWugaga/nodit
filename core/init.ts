@@ -14,9 +14,9 @@ import {
   renderArchitecture,
   renderClaudeBlock,
   renderSkill,
+  SKILL_KINDS,
   skillPath,
   TEMPLATE_VERSION,
-  type SkillKind,
 } from './templates'
 
 export { lineDiff }
@@ -139,7 +139,7 @@ export function initPaths(config: NoditConfig, ai = true) {
     '.gitignore',
     config.paths.architecture,
     ...CARD_KINDS.map((k) => config.paths[k]),
-    ...(ai ? ['AGENTS.md', 'CLAUDE.md', ...(['adr', 'milestone', 'task'] as SkillKind[]).map(skillPath)] : []),
+    ...(ai ? ['AGENTS.md', 'CLAUDE.md', ...SKILL_KINDS.map(skillPath)] : []),
   ]
 }
 
@@ -198,7 +198,7 @@ export async function planInit(ops: Pick<InitOps, 'read'>, config: NoditConfig, 
   if (ai) {
     items.push(blockItem('AGENTS.md', 'AGENTS.md（Codex 等工具）', files.get('AGENTS.md') ?? null, renderAgentsBlock(config), managed['AGENTS.md#nodit']?.hash))
     items.push(blockItem('CLAUDE.md', 'CLAUDE.md（Claude Code）', files.get('CLAUDE.md') ?? null, renderClaudeBlock(config), managed['CLAUDE.md#nodit']?.hash))
-    for (const kind of ['adr', 'milestone', 'task'] as SkillKind[]) {
+    for (const kind of SKILL_KINDS) {
       const p = skillPath(kind)
       items.push(fileItem(p, `Claude skill：${p.split('/')[2]}`, files.get(p) ?? null, renderSkill(kind, config), managed[p]?.hash))
     }
