@@ -3,8 +3,10 @@ import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Frame, StatusDots } from './components/Frame'
 import { Header } from './components/Header'
+import { HelpPanel } from './components/HelpPanel'
 import { InitPanel } from './components/InitPanel'
 import { DeleteDialog, RawEditor, Toast } from './components/Overlays'
+import { ProjectSwitcher, SwitchedAway } from './components/ProjectSwitcher'
 import { isTyping, useFocusNode } from './hooks'
 import { Inspector } from './components/Inspector'
 import { Sidebar } from './components/Sidebar'
@@ -14,6 +16,7 @@ import { LinkEdgeView, LinkMarkers } from './nodes/LinkEdgeView'
 import { useProject } from './store'
 import type { CardNode } from './types'
 
+const TasksPage = lazy(() => import('./tasks/TasksPage').then((m) => ({ default: m.TasksPage })))
 const ArchitecturePage = lazy(() => import('./architecture/ArchitecturePage').then((m) => ({ default: m.ArchitecturePage })))
 
 const nodeTypes = { card: CardNodeView }
@@ -151,6 +154,7 @@ function useDeleteKey() {
 export default function App() {
   const theme = useProject((s) => s.theme)
   const view = useProject((s) => s.view)
+  const canvasEpoch = useProject((s) => s.canvasEpoch)
   useDeleteKey()
 
   useEffect(() => {
@@ -166,10 +170,15 @@ export default function App() {
           <main className="stage">
             {view === 'graph' ? (
               <>
-                <Canvas />
+                <Canvas key={canvasEpoch} />
                 <Toolbar />
                 <Inspector />
               </>
+            ) : view === 'tasks' ? (
+              <Suspense fallback={null}>
+                <TasksPage />
+                <Inspector />
+              </Suspense>
             ) : (
               <Suspense fallback={null}>
                 <ArchitecturePage />
@@ -183,6 +192,9 @@ export default function App() {
       <RawEditor />
       <DeleteDialog />
       <InitPanel />
+      <ProjectSwitcher />
+      <SwitchedAway />
+      <HelpPanel />
       <LinkMarkers />
     </ReactFlowProvider>
   )

@@ -51,7 +51,7 @@ describe('nodit new', () => {
       const ui = () =>
         fetch(`${base}/api/cards`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': srv.owner.token },
+          headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': srv.owner.token, 'X-Nodit-Session': srv.project.sessionId },
           body: JSON.stringify({ type: 'task', title: 'From UI' }),
         }).then((r) => r.json())
       const [a, b, c] = await Promise.all([nodit('new', 'task', 'CLI A', '--dir', root, '--json'), nodit('new', 'task', 'CLI B', '--dir', root, '--json'), ui()])

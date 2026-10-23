@@ -16,7 +16,7 @@ async function temp(){ const p=await mkdtemp(path.join(tmpdir(),'nodit-extra-'))
 async function fixture(){ const p=await temp(); await cp(path.resolve('examples/demo'),p,{recursive:true,filter:s=>!s.includes('/.nodit/')||!/(writer\.lock|owner\.json|token)/.test(s)}); return p }
 async function serve(root:string){const s=await start({root,port:0});servers.push(s);return s}
 function doc(s:RunningServer,p=T3){return s.project.snapshot().docs.find(d=>d.path===p)!}
-async function send(s:RunningServer,method:string,p:string,body:unknown){ const base=`http://127.0.0.1:${s.port}`;return fetch(base+p,{method,headers:{Origin:base,'X-Nodit-Token':s.owner.token,'Content-Type':'application/json'},body:JSON.stringify(body)}) }
+async function send(s:RunningServer,method:string,p:string,body:unknown){ const base=`http://127.0.0.1:${s.port}`;return fetch(base+p,{method,headers:{Origin:base,'X-Nodit-Token':s.owner.token,'X-Nodit-Session':s.project.sessionId,'Content-Type':'application/json'},body:JSON.stringify(body)}) }
 function defer<T=any>(){let resolve!:(x:T)=>void;const promise=new Promise<T>(r=>resolve=r);return {promise,resolve}}
 const sleep=(n:number)=>new Promise(r=>setTimeout(r,n))
 afterEach(async()=>{await Promise.all(servers.splice(0).map(s=>s.close()));await Promise.all(roots.splice(0).map(p=>rm(p,{recursive:true,force:true})))})
@@ -65,13 +65,13 @@ describe('independent acceptance probes',()=>{
  it('A10 old connection generation initial response is ignored',async()=>{
   const requests:any[]=[];const applied:any[]=[];let handlers:any;
   const fake:any={connGen:0,getProject:()=>{const d=defer();requests.push(d);return d.promise},subscribe:(h:any)=>{handlers=h;return()=>{}}};
-  const sync=new ProjectSync(fake,{apply:e=>applied.push(e),connection:()=>{},compromised:()=>{},error:()=>{}});sync.start();
+  const sync=new ProjectSync(fake,{apply:e=>applied.push(e),connection:()=>{},compromised:()=>{},switched:()=>{},error:()=>{}});sync.start();
   fake.connGen++;handlers.hello({projectId:'p',sessionId:'s',rev:2});requests[0].resolve({projectId:'p',sessionId:'s',rev:1});await sleep(0);expect(applied).toHaveLength(0);sync.stop()
  })
  it('A11 SSE hello gap converges and delayed old snapshot cannot regress state',async()=>{
   const requests:any[]=[],applied:any[]=[];let handlers:any;
   const fake:any={connGen:0,getProject:()=>{const d=defer();requests.push(d);return d.promise},subscribe:(h:any)=>{handlers=h;return()=>{}}};
-  const sync=new ProjectSync(fake,{apply:e=>applied.push(e),connection:()=>{},compromised:()=>{},error:()=>{}});sync.start();requests[0].resolve({projectId:'p',sessionId:'s1',rev:1});await sleep(0);
+  const sync=new ProjectSync(fake,{apply:e=>applied.push(e),connection:()=>{},compromised:()=>{},switched:()=>{},error:()=>{}});sync.start();requests[0].resolve({projectId:'p',sessionId:'s1',rev:1});await sleep(0);
   fake.connGen++;handlers.hello({projectId:'p',sessionId:'s1',rev:3});requests[1].resolve({projectId:'p',sessionId:'s1',rev:3});await sleep(0);
   const a=sync.fetch();fake.connGen++;handlers.hello({projectId:'p',sessionId:'s2',rev:1});requests[3].resolve({projectId:'p',sessionId:'s2',rev:1});await sleep(0);requests[2].resolve({projectId:'p',sessionId:'s1',rev:99});await a;
   expect(applied.map(x=>[x.sessionId,x.rev])).toEqual([['s1',1],['s1',3],['s2',1]]);sync.stop()

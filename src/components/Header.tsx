@@ -1,4 +1,4 @@
-import { Archive, Download, Search, Upload, X } from 'lucide-react'
+import { Archive, ChevronDown, CircleHelp, Download, Search, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { LEGACY_STORAGE_KEY, useProject } from '../store'
@@ -20,8 +20,17 @@ function readLegacy() {
 }
 
 export function Header() {
-  const { projectName, query, setQuery, view, setView, importLegacy } = useProject(
-    useShallow((s) => ({ projectName: s.projectName, query: s.query, setQuery: s.setQuery, view: s.view, setView: s.setView, importLegacy: s.importLegacy })),
+  const { projectName, query, setQuery, view, setView, importLegacy, setSwitcherOpen, setHelpOpen } = useProject(
+    useShallow((s) => ({
+      projectName: s.projectName,
+      query: s.query,
+      setQuery: s.setQuery,
+      view: s.view,
+      setView: s.setView,
+      importLegacy: s.importLegacy,
+      setSwitcherOpen: s.setSwitcherOpen,
+      setHelpOpen: s.setHelpOpen,
+    })),
   )
   const searchRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -61,7 +70,10 @@ export function Header() {
       <div className="crumbs mono">
         <span>Workspace</span>
         <span className="crumbs__sep">/</span>
-        <span className="crumbs__project">{projectName || '…'}</span>
+        <button type="button" className="crumbs__project crumbs__switch" title="切換到另一個本地專案" onClick={() => setSwitcherOpen(true)}>
+          {projectName || '…'}
+          <ChevronDown size={13} />
+        </button>
         <span className="crumbs__sep">/</span>
         <span className="view-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={view === 'graph'} className={view === 'graph' ? 'is-active' : ''} onClick={() => setView('graph')}>
@@ -75,6 +87,9 @@ export function Header() {
             onClick={() => setView('architecture')}
           >
             Architecture
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'tasks'} className={view === 'tasks' ? 'is-active' : ''} onClick={() => setView('tasks')}>
+            Tasks
           </button>
         </span>
       </div>
@@ -128,6 +143,10 @@ export function Header() {
             </button>
           )}
         </div>
+
+        <button type="button" className="icon-btn" title="說明手冊（?）" aria-label="開啟說明手冊" onClick={() => setHelpOpen(true)}>
+          <CircleHelp size={16} />
+        </button>
       </div>
     </header>
   )

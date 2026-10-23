@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { homedir } from 'node:os'
 import { createInterface } from 'node:readline/promises'
 import { CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { ImportError, runImport, type ImportConflict, type ImportReport } from '../core/import'
@@ -12,7 +13,7 @@ import type { ClientDoc } from '../core/protocol'
 import { ValidationError, Writer, type LinkChange, type NewCard } from '../core/writer'
 import { start } from './server'
 
-const HELP = `nodit [dir] [--port 4319]            開啟專案（預設為目前目錄）
+const HELP = `nodit [dir] [--port 4319] [--browse-root <path>]   開啟專案（預設為目前目錄）；UI 內只能切換到 browse root 底下的專案（預設為家目錄）
 nodit init [dir] [--no-ai] [--yes] [--dry-run]   初始化：設定檔、資料夾與 AI 指令檔
 nodit new <adr|milestone|task> "<title>" [options]
     --dir <path>             專案目錄（預設 .）
@@ -37,10 +38,11 @@ class CliError extends Error {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 function parseServeArgs(argv: string[]) {
-  const args = { dir: '.', port: 4319, devOrigins: [] as string[] }
+  const args = { dir: '.', port: 4319, devOrigins: [] as string[], browseRoot: undefined as string | undefined }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--port') args.port = Number(argv[++i])
+    else if (a === '--browse-root') args.browseRoot = path.resolve(argv[++i])
     else if (a === '--dev-origin') args.devOrigins.push(argv[++i])
     else if (!a.startsWith('-')) args.dir = a
   }
@@ -50,7 +52,14 @@ function parseServeArgs(argv: string[]) {
 async function serve(argv: string[]) {
   const args = parseServeArgs(argv)
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
-  const running = await start({ root: args.dir, port: args.port, devOrigins: args.devOrigins, distDir: existsSync(dist) ? dist : undefined })
+  const running = await start({
+    root: args.dir,
+    port: args.port,
+    devOrigins: args.devOrigins,
+    distDir: existsSync(dist) ? dist : undefined,
+    browseRoot: args.browseRoot,
+    recentFile: path.join(homedir(), '.nodit', 'recent.json'),
+  })
   console.log(`Nodit ▸ ${path.resolve(args.dir)}`)
   console.log(`       http://127.0.0.1:${running.port}`)
   if (!running.project.configExists) console.log('       尚未初始化（找不到 nodit.config.json）')
@@ -105,7 +114,7 @@ async function serverApi(root: string, owner: OwnerInfo): Promise<ServerApi> {
   return async (method, url, body) => {
     const res = await fetch(`${base}${url}`, {
       method,
-      headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': token },
+      headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': token, 'X-Nodit-Session': owner.sessionId },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     return { status: res.status, body: await res.json().catch(() => ({})) }

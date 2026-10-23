@@ -77,8 +77,20 @@ type State = {
 
   importLegacy: (text: string) => Promise<void>
 
-  view: 'graph' | 'architecture'
-  setView: (view: 'graph' | 'architecture') => void
+  switcherOpen: boolean
+  setSwitcherOpen: (open: boolean) => void
+  helpOpen: boolean
+  setHelpOpen: (open: boolean) => void
+  /** another tab switched the server to this project; this tab stopped syncing and writing */
+  switchedAway?: { name: string }
+  /** resolves with an error message, or null once the new project is loaded */
+  switchProject: (path: string) => Promise<string | null>
+  unsavedDrafts: () => number
+  /** remounts the canvas so a newly opened project gets fitted from scratch */
+  canvasEpoch: number
+
+  view: 'graph' | 'architecture' | 'tasks'
+  setView: (view: 'graph' | 'architecture' | 'tasks') => void
   architecture: { path: string; revision: string }
   /** docKey to focus once the canvas is mounted (e.g. after clicking a card ref on the architecture page) */
   pendingFocus: string | null
@@ -269,6 +281,7 @@ export const useProject = create<State>()(
         apply,
         connection: (connection) => set({ connection }),
         compromised: (compromised) => set({ compromised }),
+        switched: (to) => set({ switchedAway: to }),
         error: (err) => set({ loadError: err instanceof Error ? err.message : String(err) }),
       })
       queueMicrotask(() => sync.start())
@@ -548,6 +561,42 @@ export const useProject = create<State>()(
         setInitOpen: (initOpen) => {
           set({ initOpen })
           if (!initOpen) void sync.fetch()
+        },
+
+        switcherOpen: false,
+        setSwitcherOpen: (switcherOpen) => set({ switcherOpen }),
+        helpOpen: false,
+        setHelpOpen: (helpOpen) => set({ helpOpen }),
+        canvasEpoch: 0,
+        unsavedDrafts: () => drafts.size + Object.keys(pendingLayout).length,
+        switchProject: async (target) => {
+          sync.beginSwitch()
+          const result = await client.switchProject(target)
+          if (!result.ok) {
+            sync.endSwitch()
+            return result.message
+          }
+          drafts.clear()
+          clearTimeout(layoutTimer)
+          for (const code of Object.keys(pendingLayout)) delete pendingLayout[code]
+          set({
+            meta: null,
+            docs: [],
+            nodes: [],
+            edges: [],
+            layout: {},
+            rawDocKey: null,
+            deleteRequest: null,
+            initOpen: false,
+            switcherOpen: false,
+            view: 'graph',
+            query: '',
+            pendingFocus: null,
+            compromised: undefined,
+            canvasEpoch: get().canvasEpoch + 1,
+          })
+          sync.adopt(result.snapshot)
+          return null
         },
 
         importLegacy: async (text) => {

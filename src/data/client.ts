@@ -4,8 +4,11 @@ import type { ClientDoc, Diagnostic, Envelope, MutationResult, ProjectPayload } 
 
 export type Meta = { projectId: string; sessionId: string; rev: number }
 
+export type SwitchTarget = { projectId: string; sessionId: string; name: string }
+
 export type SubscribeHandlers = {
   hello: (e: Envelope<object>) => void
+  switched: (e: Envelope<{ to: SwitchTarget }>) => void
   changed: (e: Envelope<{ changed: string[] }>) => void
   status: (s: 'open' | 'closed') => void
   compromised: (message: string) => void
@@ -33,6 +36,8 @@ export type LayoutResult =
 export interface ProjectClient {
   /** increments every time the event stream (re)connects */
   readonly connGen: number
+  /** session of the snapshot this tab shows; every write carries it and the server refuses a mismatch */
+  sessionId: string | null
   getProject(): Promise<Envelope<ProjectPayload>>
   /** keys prefixed with `section:` are sent as managed section edits */
   patchDoc(docKey: string, baseRevision: string, patch: Record<string, string | null>): Promise<MutationResult>
@@ -47,7 +52,15 @@ export interface ProjectClient {
   applyInit(planId: string, itemIds: string[]): Promise<{ ok: true; results: InitResultView[] } | Failure>
   importLegacy(text: string): Promise<ImportResult>
   subscribe(handlers: SubscribeHandlers): () => void
+  listDir(path: string | null): Promise<DirListing>
+  recentProjects(): Promise<RecentProjects>
+  /** on success the client already carries the new project's token and session */
+  switchProject(path: string): Promise<{ ok: true; snapshot: Envelope<ProjectPayload> } | Failure>
 }
+
+export type DirEntry = { name: string; path: string; project: boolean }
+export type DirListing = { root: string; path: string; parent: string | null; entries: DirEntry[] }
+export type RecentProjects = { current: string; browseRoot: string; items: { path: string; name: string; openedAt: string }[] }
 
 export type ImportResult = { ok: true; report: ImportReport } | (Failure & { conflicts?: ImportConflict[] })
 

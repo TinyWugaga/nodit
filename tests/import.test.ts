@@ -221,7 +221,7 @@ describe('legacy import', () => {
       const base = `http://127.0.0.1:${srv.port}`
       const again = await fetch(`${base}/api/import`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': srv.owner.token },
+        headers: { 'Content-Type': 'application/json', Origin: base, 'X-Nodit-Token': srv.owner.token, 'X-Nodit-Session': srv.project.sessionId },
         body: JSON.stringify({ text: LEGACY }),
       }).then((res) => res.json())
       expect(again.report.status).toBe('already-complete')

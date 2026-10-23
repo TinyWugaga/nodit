@@ -12,7 +12,24 @@
 
 ## 安裝
 
-Nodit 沒有發布到 npm，從原始碼安裝：
+npm 套件名稱是 `@tinywugaga/nodit`，安裝後的指令是 `nodit`。
+
+```bash
+npm install -g @tinywugaga/nodit
+```
+
+也可以裝成專案的 devDependency，讓整個團隊用同一個版本：
+
+```bash
+npm install -D @tinywugaga/nodit
+npx --no nodit
+```
+
+> 用 npx 時一律加 `--no`：它只執行專案裡已安裝的版本。不加的話，本地找不到時 npx 會從 npm 下載套件來執行。
+
+### 從原始碼安裝
+
+開發 Nodit 本身，或套件還沒發佈時：
 
 ```bash
 npm install
@@ -20,9 +37,7 @@ npm run build
 npm link
 ```
 
-`npm run build` 會產生 `dist/`，`nodit` server 就是用它提供 UI。`npm link` 會建立全域的 `nodit` 指令。
-
-> 不要用 `npx nodit`：npm 上不是這個專案，npx 可能會下載到不相干的同名套件。
+`npm run build` 會產生 `dist/`（UI）與 `dist-server/`（CLI 與 server），`npm link` 會建立全域的 `nodit` 指令。
 
 ## 快速開始
 
@@ -144,7 +159,7 @@ NODIT_PROJECT=../my-project npm run dev
 | --- | --- |
 | `npm test` | vitest：解析與寫入保真度、寫入鎖與併發、init、server 安全邊界、XSS |
 | `npm run typecheck` | TypeScript 型別檢查 |
-| `npm run build` | 型別檢查 + 產生 `dist/` |
+| `npm run build` | 型別檢查 + 產生 `dist/` 與 `dist-server/` |
 
 ```
 core/      domain、解析、最小 diff 編輯、寫入佇列、寫入鎖、init、模板
@@ -154,3 +169,13 @@ tests/     vitest
 examples/  demo 專案
 docs/      本專案自己的決策紀錄
 ```
+
+### 發佈
+
+`npm pack` 與 `npm publish` 會先經由 `prepack` 跑 `npm run build`。套件只包含 `bin/`、`dist/`、`dist-server/`；執行期依賴只有 `chokidar`、`proper-lockfile`、`yaml`，UI 用到的套件都已打包進 `dist/`。
+
+```bash
+npm pack --dry-run
+```
+
+確認檔案清單後再執行 `npm publish`。scope `@tinywugaga` 必須是發佈者的 npm 帳號或 organization。

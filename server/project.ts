@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { watch, type FSWatcher } from 'chokidar'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { CONFIG_FILE, CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { CARD_KINDS } from '../core/domain'
@@ -39,6 +39,9 @@ export class ProjectService extends EventEmitter {
   private timer?: NodeJS.Timeout
   private catchUp?: NodeJS.Timeout
 
+  /** realpath of root, filled in by start() */
+  realRoot = ''
+
   constructor(readonly root: string) {
     super()
     this.on('error', (err) => console.error('[nodit] rescan failed:', err))
@@ -64,6 +67,7 @@ export class ProjectService extends EventEmitter {
   snapshot(): Envelope<ProjectPayload> {
     return this.envelope({
       name: path.basename(this.root),
+      root: this.realRoot || this.root,
       initialized: this.configExists,
       config: this.config,
       status: this.status,
@@ -75,6 +79,7 @@ export class ProjectService extends EventEmitter {
   }
 
   async start() {
+    this.realRoot = await realpath(this.root)
     await this.rescan()
     this.watched = this.watchPaths(this.config)
     this.watcher = watch(this.watched, {
