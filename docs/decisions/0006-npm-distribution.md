@@ -13,6 +13,8 @@
 ## 決策
 
 - **套件名稱**：`@tinywugaga/nodit`，指令名稱維持 `nodit`。用 scope 避開名稱相似規則與搶註；`publishConfig.access` 設為 `public`。
+  - scope 對應發佈者的 npm 帳號 `tinywugaga`（2026-10-23 由帳號持有人確認）。
+  - 原始碼在 https://github.com/TinyWugaga/nodit （公開），`repository`、`homepage`、`bugs` 都指向這個 repo。
 - **server 預先打包**：`npm run build:server` 用 esbuild 把 `server/cli.ts` 與 `core/` 打包成 `dist-server/cli.mjs`（ESM、`--packages=external`）。`bin/nodit.mjs` 只 import 這個檔案，執行期不需要 tsx。
   - 打包後的 `cli.mjs` 用 `../dist` 找 UI，和原始碼位置的相對關係相同。
   - 開發與測試照舊用 tsx 直接跑 `server/cli.ts`。
@@ -21,8 +23,7 @@
 
 ## 尚未處理
 
-- 沒有 LICENSE、`repository`、`homepage`，發佈前要決定授權。
-- scope `@tinywugaga` 必須是發佈者的 npm 帳號或 organization；本機目前沒有登入 npm，無法確認。
+- 沒有 LICENSE，發佈前要決定授權。
 - 發佈方式（手動或 CI 帶 provenance）、版本與 changelog 流程未定。
 
 ## 後果
