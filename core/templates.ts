@@ -1,7 +1,7 @@
 import type { NoditConfig } from './config'
 import { REVIEW_STATUSES, REVIEW_VERDICTS, STATUSES } from './domain'
 
-export const TEMPLATE_VERSION = 4
+export const TEMPLATE_VERSION = 5
 
 export const BLOCK_START = (v: number) => `<!-- nodit:start v${v} -->`
 export const BLOCK_END = '<!-- nodit:end -->'
@@ -33,7 +33,7 @@ function reviewRules(config: NoditConfig): string[] {
     '  ```',
     '',
     '  不要在 review 寫完後對最新檔案重算：那會把你沒讀過的修改標成已評估。只有確定 repo 用 SHA-1 時，才能改用 `git hash-object --no-filters FILE`。',
-    '- `status` 一律寫 `open`；之後的處理狀態由人在 Nodit 裡改。不要修改既有 review 的 frontmatter。',
+    '- `status` 一律寫 `open`；之後的處理狀態由人在 Nodit 裡改。評估時不要修改既有的 review。',
     '',
     '| 欄位 | 值 |',
     '| --- | --- |',
@@ -46,6 +46,23 @@ function reviewRules(config: NoditConfig): string[] {
     '| `target_rev` | 選填；`卡片 ID: 指紋` 對照表 |',
     '',
     '正文寫 `## Summary`（結論）與 `## Findings`（每個問題一個 `- [ ]` 項目，Nodit 會計算未處理數量）。其他段落會原樣顯示。',
+  ]
+}
+
+/** How to work through an existing review's findings; shared by the rules block and the resolve skill. */
+function resolveRules(config: NoditConfig): string[] {
+  const p = config.paths
+  return [
+    `範圍：指定了 review 檔就處理那一份。只說「處理 review」時，處理 \`${p.review}/\` 裡 \`status: open\`、格式正確、還有未勾選 finding 的 review；指定卡片 ID 時只處理 \`target\` 含那張卡片的。\`addressed\`、\`dismissed\` 的 review 不處理；格式錯誤的 review 不處理，在回覆裡列出路徑。`,
+    '',
+    `1. 讀 review 的 frontmatter、Summary 與 Findings，再讀 \`target\` 列出的每張卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。`,
+    '2. 逐條處理 Findings 裡還沒勾選的 `- [ ]` 項目：',
+    '   - 同意的：修改目標卡片。只動相關的欄位或段落，不要重排整份檔案，不要改 `id`。',
+    '   - 需要另外開工作的：用 `nodit new task "<標題>" --implements <目標ID>` 建 Task，不要硬塞進現有卡片。專案把 Nodit 裝成 devDependency 時改用 `npx --no nodit`；兩者都不可用時，照 Task 格式手寫，編號取現有最大值 + 1。',
+    '   - 不同意的：不要改卡片，在回覆裡說明理由。',
+    '3. 已處理的項目，在 review 正文把 `- [ ]` 改成 `- [x]`，並在同一行後面補一句做了什麼。不同意的項目保持未勾選。',
+    '4. 不要修改 review 的 frontmatter，特別是 `status` 和 `target_rev`：`status` 由人在 Nodit 裡改，`target_rev` 要保留原本評估時的版本。修改過的卡片在 Nodit 會顯示「評估後已修改」，這是預期結果。',
+    '5. 完成後列出：每份 review 的每條 finding 怎麼處理（已修改／已開 Task／不同意）、改了哪些檔案、還有哪些需要人決定。',
   ]
 }
 
@@ -107,6 +124,12 @@ export function renderRules(config: NoditConfig): string[] {
     `被要求評估 ADR、Milestone 或 Task 時，把結果寫成 \`${config.paths.review}/\` 裡的一份新檔案，Nodit 會把它掛到目標卡片上。`,
     '',
     ...reviewRules(config),
+    '',
+    '### 處理 review',
+    '',
+    '被要求處理 review 時：',
+    '',
+    ...resolveRules(config),
   ]
 }
 
@@ -124,7 +147,7 @@ export function renderClaudeBlock(config: NoditConfig) {
     '',
     '### Claude Code skills',
     '',
-    '建立卡片時使用 `/nodit-adr`、`/nodit-milestone`、`/nodit-task`；撰寫或更新架構文件時使用 `/nodit-architecture`；評估卡片時使用 `/nodit-review`。',
+    '建立卡片時使用 `/nodit-adr`、`/nodit-milestone`、`/nodit-task`；撰寫或更新架構文件時使用 `/nodit-architecture`；評估卡片時使用 `/nodit-review`；處理 review 的 findings 時使用 `/nodit-review-resolve`。',
   ])
 }
 
@@ -158,7 +181,7 @@ const SKILL_SPEC = {
   },
 } as const
 
-export const SKILL_KINDS = ['adr', 'milestone', 'task', 'architecture', 'review'] as const
+export const SKILL_KINDS = ['adr', 'milestone', 'task', 'architecture', 'review', 'review-resolve'] as const
 
 export type SkillKind = (typeof SKILL_KINDS)[number]
 
@@ -169,6 +192,7 @@ export function skillPath(kind: SkillKind) {
 export function renderSkill(kind: SkillKind, config: NoditConfig) {
   if (kind === 'architecture') return renderArchitectureSkill(config)
   if (kind === 'review') return renderReviewSkill(config)
+  if (kind === 'review-resolve') return renderResolveSkill(config)
   const s = SKILL_SPEC[kind]
   const dir = config.paths[kind]
   return [
@@ -200,6 +224,36 @@ export function renderSkill(kind: SkillKind, config: NoditConfig) {
   ].join('\n')
 }
 
+function renderResolveSkill(config: NoditConfig) {
+  const p = config.paths
+  return [
+    '---',
+    'name: nodit-review-resolve',
+    `description: 被要求處理、回應、修正或消化這個專案的 review（${p.review}/ 裡未處理的 findings）時使用。依 findings 修改目標卡片或開 Task，在 review 正文勾選已處理的項目，不改 review 的 frontmatter。`,
+    `# nodit-managed v${TEMPLATE_VERSION}`,
+    '---',
+    '',
+    '# 處理 review 的 findings（Nodit 格式）',
+    '',
+    ...resolveRules(config),
+    '',
+    '## 範例',
+    '',
+    '處理後的 Findings：',
+    '',
+    '```markdown',
+    '## Findings',
+    '',
+    '- [x] 補上效能門檻。— 在 ADR-001 的 Consequences 加上 500 節點以上改用分層顯示。',
+    '- [x] 說明 re-render 的控制方式。— 開了 T-012 追蹤，不在 ADR 內展開。',
+    '- [ ] 改用 Canvas 2D 渲染。',
+    '```',
+    '',
+    '第三項不同意，保持未勾選，並在回覆裡說明理由。',
+    '',
+  ].join('\n')
+}
+
 function renderReviewSkill(config: NoditConfig) {
   const p = config.paths
   return [
@@ -212,7 +266,7 @@ function renderReviewSkill(config: NoditConfig) {
     '# 評估卡片（Nodit review 格式）',
     '',
     `1. 讀目標卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。讀每個目標檔的同時，用下方「格式」裡的指令算出它的指紋並記下來。`,
-    '2. 評估完成後，依格式建立一份新檔案。不要修改目標卡片本身，也不要修改既有的 review。',
+    '2. 評估完成後，依格式建立一份新檔案。評估時不要修改目標卡片本身，也不要修改既有的 review；要處理既有 review 的 findings 時改用 `/nodit-review-resolve`。',
     '3. 每個問題寫成 `## Findings` 下的一個 `- [ ]` 項目，具體說明問題與建議。',
     '4. `verdict`：可以直接接受寫 `approve`；需要修改寫 `changes`；方向有根本問題寫 `reject`。',
     '',

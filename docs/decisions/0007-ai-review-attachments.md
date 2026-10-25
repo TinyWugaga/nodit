@@ -21,6 +21,16 @@
 - **Findings 在前端解析**：`marked` 是 devDependency，server bundle 用 `--packages=external`，執行期沒有 marked。server 傳完整正文，前端用 marked lexer 計算 `## Findings` 下的 checklist（含巢狀，不計 code fence 內容）。
 - **衍生狀態要觸發變更通知**：卡片修改、刪除、重新建立都會改變 target 狀態，即使 review 檔本身沒變。ProjectService 以連結後的 reviews 整體做 JSON 比對（固定依 path 排序），有差異才遞增 rev。
 
+## 處理 review（2026-10-25 補充）
+
+讓使用者直接說「處理 review」，不用每次重貼流程。規則寫進 AGENTS.md／CLAUDE.md，另外新增 `nodit-review-resolve` Claude skill（`TEMPLATE_VERSION` 5）。
+
+- **範圍**：指定 review 檔就處理那一份。沒指定時，只處理 `status: open`、格式正確、還有未勾選 finding 的 review；指定卡片 ID 時再縮小到 `target` 含那張卡片的 review。
+- **分工**：AI 依 finding 修改目標卡片，需要另外做的事用 `nodit new task --implements` 開 Task，不同意的項目只在回覆裡說明。
+- **review 檔**：AI 只能勾選正文的 checklist，並在同一行註明做了什麼，不改 frontmatter。`status` 是人對整份 review 的判斷；`target_rev` 記錄評估時讀到的內容，改掉的話就看不出卡片在評估後被修改過。
+- 卡片被修改後，review 會顯示「評估後已修改」，這是預期結果。要評估修改後的版本，就另外寫一份新的 review。
+- 下方「影響」說的「finding 轉 Task 不在 v1 範圍」，指的是 UI 上的一鍵轉換；透過 AI 開 Task 由這一節涵蓋。
+
 ## 影響
 
 - `TEMPLATE_VERSION` 升為 4：AGENTS.md／CLAUDE.md 加入 Review 規則（Codex 只讀 AGENTS.md，規則必須自給自足），另外新增 `nodit-review` Claude skill。
