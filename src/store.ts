@@ -23,9 +23,11 @@ type Connection = 'connecting' | 'open' | 'closed'
 
 type State = {
   theme: 'light' | 'dark'
+  sidebarCollapsed: boolean
   tool: 'select' | 'hand'
   query: string
   setTheme: (theme: 'light' | 'dark') => void
+  toggleSidebar: () => void
   setTool: (tool: 'select' | 'hand') => void
   setQuery: (query: string) => void
 
@@ -344,9 +346,11 @@ export const useProject = create<State>()(
 
       return {
         theme: 'dark',
+        sidebarCollapsed: false,
         tool: 'select',
         query: '',
         setTheme: (theme) => set({ theme }),
+        toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
         setTool: (tool) => set({ tool }),
         setQuery: (query) => set({ query }),
 
@@ -620,7 +624,7 @@ export const useProject = create<State>()(
     {
       name: 'nodit:ui',
       version: 1,
-      partialize: (s) => ({ theme: s.theme }),
+      partialize: (s) => ({ theme: s.theme, sidebarCollapsed: s.sidebarCollapsed }),
     },
   ),
 )

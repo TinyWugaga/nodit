@@ -23,6 +23,7 @@
   --sp-xl: 32px;
 
   --sidebar-w: 272px;
+  --rail-w: 56px;
   --bar-h: 56px;
   --drawer-w: 420px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -182,6 +183,10 @@ kbd {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   height: 100%;
+  transition: grid-template-columns 0.22s var(--ease);
+}
+.app:has(.sidebar.is-collapsed) {
+  --sidebar-w: var(--rail-w);
 }
 
 .workspace {
@@ -257,6 +262,72 @@ kbd {
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.sidebar__name {
+  flex: 1;
+}
+.sidebar__toggle {
+  margin-right: calc(-1 * var(--sp-xs));
+}
+
+/* collapsed rail */
+.sidebar.is-collapsed {
+  overflow: hidden;
+}
+.sidebar.is-collapsed .sidebar__brand {
+  position: relative;
+  justify-content: center;
+  padding: 0;
+}
+.sidebar.is-collapsed .sidebar__name,
+.sidebar.is-collapsed .sec-head__tag,
+.sidebar.is-collapsed .sec-head > :not(.mono),
+.sidebar.is-collapsed .nav-item__code,
+.sidebar.is-collapsed .nav-item__title,
+.sidebar.is-collapsed .sidebar__empty,
+.sidebar.is-collapsed .diag-list,
+.sidebar.is-collapsed .live__text {
+  display: none;
+}
+.sidebar.is-collapsed .sidebar__toggle {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+}
+.sidebar.is-collapsed .sidebar__brand:hover .sidebar__toggle,
+.sidebar.is-collapsed .sidebar__toggle:focus-visible {
+  opacity: 1;
+}
+.sidebar.is-collapsed .sidebar__brand:hover .logo {
+  opacity: 0;
+}
+.sidebar.is-collapsed .sidebar__scroll {
+  padding: var(--sp-md) var(--sp-sm);
+}
+.sidebar.is-collapsed .sidebar__section h2 {
+  justify-content: center;
+  padding: 0;
+}
+.sidebar.is-collapsed .nav-item {
+  position: relative;
+  grid-template-columns: 16px;
+  justify-content: center;
+  padding: var(--sp-sm) 0;
+}
+.sidebar.is-collapsed .nav-item__dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+}
+.sidebar.is-collapsed .sidebar__foot {
+  flex-direction: column;
+  gap: var(--sp-sm);
+  padding: var(--sp-md) 0;
+}
+.sidebar.is-collapsed .sidebar__actions {
+  flex-direction: column;
 }
 
 .sidebar__scroll {
