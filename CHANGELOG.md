@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
 ### Added
 
 - `nodit --version`（`-v`）顯示安裝的版本。
@@ -68,7 +70,8 @@
 - 匯入舊版 localStorage JSON，可中斷後繼續。
 - 寫入鎖：同一個專案只允許一個 Nodit server 寫入。
 
-[Unreleased]: https://github.com/TinyWugaga/nodit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/TinyWugaga/nodit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/TinyWugaga/nodit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TinyWugaga/nodit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TinyWugaga/nodit/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/TinyWugaga/nodit/compare/92c26fd...v0.1.1
