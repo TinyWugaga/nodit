@@ -16,7 +16,7 @@
 - **過期判定用 SHA-1 git blob hash**：`target_rev` 記錄 AI 讀到的目標內容指紋，Nodit 對目前檔案算同一個值比對。target 狀態分為 current／stale／unrecorded／missing；沒填 `target_rev` 顯示「未記錄版本」，不視為仍有效。
   - 演算法固定為 SHA-1，不隨 repo 的 object format 改變。git 2.55 的 `hash-object` 沒有 `--object-format` 參數，在 SHA-256 repo 內會算出不同值，所以 AI 指令提供不依賴 git 的 shell 指令，只有確定是 SHA-1 repo 時才用 `git hash-object --no-filters`。
   - `target_rev` 必須在讀目標檔時計算。review 寫完後再對最新檔案重算，會把沒審過的修改標成 current。
-- **status 套用整份 review**：`open`／`addressed`／`dismissed`，不做逐 target 狀態。viewer 的按鈕寫明「整份 review」，並列出會一起受影響的卡片。addressed／dismissed 的 review 仍顯示 stale，不自動 reopen。
+- **status 套用整份 review**：`open`／`addressed`／`dismissed`，不做逐 target 狀態。viewer 的狀態按鈕是「標記為已處理」「略過整份」「重新開啟整份 review」；review 有多個 target 時，footer 會寫出「同時套用到 …」，列出會一起受影響的卡片。addressed／dismissed 的 review 仍顯示 stale，不自動 reopen。
 - **卡片 badge 只看自己**：只彙總無錯誤且 open 的 reviews，stale 只看這張卡片的 target。格式錯誤的 review 在 Inspector 顯示「格式錯誤」，不參與 verdict 排序與計數。
 - **Findings 在前端解析**：`marked` 是 devDependency，server bundle 用 `--packages=external`，執行期沒有 marked。server 傳完整正文，前端用 marked lexer 計算 `## Findings` 下的 checklist（含巢狀，不計 code fence 內容）。
 - **衍生狀態要觸發變更通知**：卡片修改、刪除、重新建立都會改變 target 狀態，即使 review 檔本身沒變。ProjectService 以連結後的 reviews 整體做 JSON 比對（固定依 path 排序），有差異才遞增 rev。
