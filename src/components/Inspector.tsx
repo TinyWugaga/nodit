@@ -1,5 +1,5 @@
-import { AlertTriangle, ArrowLeftRight, ArrowRight, Crosshair, FileCode2, Link2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { AlertTriangle, ArrowLeftRight, ArrowRight, Crosshair, FileCode2, Link2, Maximize2, Minimize2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { inferLinkKind, LINK_SCHEMA, shouldReverse, type LinkKind } from '../../core/domain'
 import type { DraftView } from '../data/drafts'
@@ -600,9 +600,23 @@ export function Inspector() {
   const selectedNodes = nodes.filter((n) => n.selected)
   const selectedEdges = edges.filter((e) => e.selected)
   const total = selectedNodes.length + selectedEdges.length
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!expanded || !total) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expanded, total])
+
   if (!total) return null
 
-  const close = () => select(null)
+  const close = () => {
+    setExpanded(false)
+    select(null)
+  }
   let content: ReactNode
   if (total > 1) {
     content = (
@@ -632,8 +646,20 @@ export function Inspector() {
   }
 
   return (
-    <aside className="inspector" aria-label="Inspector">
-      {content}
-    </aside>
+    <>
+      {expanded && <div className="inspector-scrim" onClick={() => setExpanded(false)} />}
+      <aside className={`inspector${expanded ? ' is-expanded' : ''}`} aria-label="Inspector" aria-modal={expanded || undefined}>
+        {content}
+        <button
+          type="button"
+          className="icon-btn ins-expand"
+          aria-label={expanded ? '收回側欄' : '展開到中央'}
+          title={expanded ? '收回側欄 (Esc)' : '展開到中央'}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+        </button>
+      </aside>
+    </>
   )
 }
