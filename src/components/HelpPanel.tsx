@@ -297,7 +297,7 @@ const SECTIONS: Section[] = [
     body: () => (
       <>
         <p>
-          init 寫入的 AGENTS.md、CLAUDE.md 區塊與 <C>.claude/skills</C>（nodit-adr、nodit-milestone、nodit-task、nodit-architecture）會教 AI 照 Nodit 的格式寫卡片與架構文件。已開著的 AI
+          init 寫入的 AGENTS.md、CLAUDE.md 區塊與 <C>.claude/skills</C>（nodit-adr、nodit-milestone、nodit-task、nodit-architecture、nodit-review）會教 AI 照 Nodit 的格式寫卡片、架構文件與 review。AI 評估卡片後寫入 <C>docs/reviews/</C> 的 review 會掛在目標卡片上，在 Inspector 的 Reviews 區塊閱讀與標記處理狀態。已開著的 AI
           工作階段要重開才會載入。
         </p>
         <p>建卡片建議讓 AI 用 CLI，由 Nodit 配發不重複的編號：</p>

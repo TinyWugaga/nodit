@@ -1,6 +1,6 @@
 import type { CardKind, LinkKind } from '../../core/domain'
 import type { ImportConflict, ImportReport } from '../../core/import'
-import type { ClientDoc, Diagnostic, Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
+import type { ClientDoc, ClientReview, Diagnostic, Envelope, MutationResult, ProjectPayload } from '../../core/protocol'
 
 export type Meta = { projectId: string; sessionId: string; rev: number }
 
@@ -27,6 +27,11 @@ export type Failure = { ok: false; reason: 'conflict' | 'invalid' | 'auth' | 'co
 
 export type CreateResult = { ok: true; envelope: Envelope<{ doc: ClientDoc }> } | Failure
 export type DeleteResult = { ok: true; envelope: Envelope<object> } | Failure
+/** 200 and 409 both carry the linked review; a 409 without `current` means refetch the snapshot. */
+export type ReviewResult =
+  | { ok: true; envelope: Envelope<{ review: ClientReview | null }> }
+  | { ok: false; reason: 'conflict'; envelope: Envelope<{ current?: ClientReview | null }> }
+  | Failure
 export type LayoutResult =
   | { ok: true; revision: string; meta: Meta }
   | { ok: false; reason: 'conflict'; layout: ProjectPayload['layout']; meta: Meta }
@@ -46,6 +51,7 @@ export interface ProjectClient {
   patchLinks(docKey: string, baseRevision: string, change: { add?: LinkChange[]; remove?: LinkChange[] }): Promise<MutationResult>
   deleteDoc(docKey: string, baseRevision: string): Promise<DeleteResult>
   createCard(input: NewCardInput): Promise<CreateResult>
+  patchReview(docKey: string, baseRevision: string, status: string): Promise<ReviewResult>
   putLayout(baseRevision: string, data: Record<string, { x: number; y: number }>): Promise<LayoutResult>
   getArchitecture(): Promise<{ path: string; revision: string; markdown: string | null }>
   getInitPlan(ai: boolean): Promise<InitPlanView>

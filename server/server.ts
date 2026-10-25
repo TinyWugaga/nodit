@@ -375,6 +375,9 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
       }
     }
 
+    const rv = /^\/api\/reviews\/([a-f0-9]{12})$/.exec(p)
+    if (rv) return patchReview(project, writer, rv[1], method, req, res)
+
     const m = /^\/api\/docs\/([a-f0-9]{12})(\/raw|\/links)?$/.exec(p)
     if (!m) throw new HttpError(404, 'not found')
     const doc = project.getDoc(m[1])
@@ -424,6 +427,34 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
     const result = await job
     const canonical = result.changed ? await project.applyWritten(result.doc) : (project.getDoc(docKey) ?? result.doc)
     return json(res, 200, project.envelope({ doc: toClientDoc(canonical) }))
+  }
+
+  /**
+   * PATCH a review's status. Success and conflict both answer with the review as linked in the
+   * snapshot; a 409 without `current` means the derived state is unavailable and the client refetches.
+   */
+  async function patchReview(project: ProjectService, writer: Writer, key: string, method: string, req: IncomingMessage, res: ServerResponse) {
+    if (method !== 'PATCH') throw new HttpError(405, 'method not allowed')
+    const review = project.getReview(key)
+    if (!review) throw new HttpError(404, 'unknown review')
+    const body = (await readBody(req)) as Record<string, unknown>
+    if (typeof body.baseRevision !== 'string' || typeof body.status !== 'string') throw new HttpError(400, 'baseRevision and status are required')
+    if (!review.writable) return json(res, 422, project.envelope({ diagnostics: review.diagnostics.filter((d) => d.level === 'error') }))
+    try {
+      const result = await writer.updateReviewStatus(review, body.baseRevision, body.status)
+      const canonical = result.changed ? await project.applyReviewWritten(result.review) : project.getReview(key)
+      return json(res, 200, project.envelope({ review: canonical ?? null }))
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        const fresh = await project.rescan().then(
+          () => true,
+          () => false,
+        )
+        return json(res, 409, project.envelope(fresh ? { current: project.getReview(key) ?? null } : {}))
+      }
+      if (err instanceof ValidationError) return json(res, 422, project.envelope({ diagnostics: err.diagnostics }))
+      throw err
+    }
   }
 
   /** Shared error mapping for every write: 409 with the current doc, 422 with diagnostics. */

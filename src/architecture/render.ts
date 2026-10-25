@@ -102,6 +102,10 @@ export function renderMarkdown(markdown: string, knownIds: Set<string>, purify: 
         }
         return `<pre class="code"><code>${escapeHtml(text)}</code></pre>`
       },
+      // `input` is forbidden by the sanitizer; show task state with a span instead
+      checkbox({ checked }) {
+        return `<span class="task-box" data-checked="${checked}" role="img" aria-label="${checked ? '已完成' : '未完成'}"></span> `
+      },
       heading({ tokens, depth }) {
         const inner = this.parser.parseInline(tokens)
         const plain = inner.replace(/<[^>]+>/g, '')
@@ -117,7 +121,7 @@ export function renderMarkdown(markdown: string, knownIds: Set<string>, purify: 
 
   const sanitize = (raw: string) =>
     purify.sanitize(raw, {
-      ADD_ATTR: ['data-card', 'data-mermaid', 'data-tab'],
+      ADD_ATTR: ['data-card', 'data-mermaid', 'data-tab', 'data-checked'],
       FORBID_TAGS: ['style', 'iframe', 'form', 'input', 'textarea', 'select', 'button', 'object', 'embed'],
       FORBID_ATTR: ['style'],
     })

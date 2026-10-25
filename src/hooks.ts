@@ -1,5 +1,6 @@
 import { useReactFlow } from '@xyflow/react'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
+import { reviewsFor } from './reviews'
 import { useProject } from './store'
 import type { CardKind } from './types'
 
@@ -53,4 +54,9 @@ export function useAddCard() {
 
 export function isTyping(el: EventTarget | null) {
   return el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+}
+
+export function useReviewsFor(cardId: string) {
+  const reviews = useProject((s) => s.reviews)
+  return useMemo(() => reviewsFor(reviews, cardId), [reviews, cardId])
 }

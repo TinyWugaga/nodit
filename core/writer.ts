@@ -4,6 +4,7 @@ import path from 'node:path'
 import {
   CARD_KINDS,
   FIELD_SCHEMA,
+  REVIEW_STATUSES,
   formatId,
   ID_RULES,
   idNumber,
@@ -21,13 +22,14 @@ import { EditError, renderDoc, setFields } from './edit'
 import { splitDoc } from './frontmatter'
 import type { Owner } from './owner'
 import { parseDoc, revisionOf, sha1, type ParsedDoc } from './parse'
-import type { Diagnostic, FieldPatch } from './protocol'
+import type { ClientReview, Diagnostic, FieldPatch } from './protocol'
+import { parseReview } from './review'
 import { scanDocs, TMP_MARK } from './scan'
 import { resolveInScope } from './scope'
 import { readSections, replaceSection } from './sections'
 
 export class ConflictError extends Error {
-  constructor(public current: ParsedDoc | null) {
+  constructor(public current: ParsedDoc | ClientReview | null) {
     super('文件已在磁碟上被修改')
   }
 }
@@ -244,6 +246,45 @@ export class Writer {
         throw err
       }
       return this.finish(abs, doc.path, doc.kind, raw, next, current)
+    })
+  }
+
+  /**
+   * Change a review's status, splicing only that value. Guards Nodit's own concurrent writes and
+   * external edits made before this write starts; an editor saving between read and rename can
+   * still be overwritten.
+   */
+  updateReviewStatus(review: Pick<ClientReview, 'path'>, baseRevision: string, status: string): Promise<{ review: ClientReview; changed: boolean }> {
+    return this.enqueue(async () => {
+      const abs = await resolveInScope(this.root, review.path, [this.config.paths.review])
+      const bad = (code: string, message: string): Diagnostic => ({ level: 'error', code, message, path: review.path })
+      let buf: Buffer
+      try {
+        buf = await readFile(abs)
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new ConflictError(null)
+        throw err
+      }
+      const current = parseReview(review.path, buf)
+      if (revisionOf(buf) !== baseRevision) throw new ConflictError(current)
+      if (!current.writable) throw new ValidationError(current.diagnostics.filter((d) => d.level === 'error'))
+      if (!(REVIEW_STATUSES as readonly string[]).includes(status)) {
+        throw new ValidationError([bad('status-invalid', `status 必須是 ${REVIEW_STATUSES.join(' / ')}`)])
+      }
+      const raw = buf.toString('utf8')
+      let next: string
+      try {
+        next = setFields(raw, { status })
+      } catch (err) {
+        if (err instanceof EditError) throw new ValidationError([bad('edit-failed', err.message)])
+        throw err
+      }
+      if (next === raw) return { review: current, changed: false }
+      const parsed = parseReview(review.path, Buffer.from(next, 'utf8'))
+      const errors = parsed.diagnostics.filter((d) => d.level === 'error')
+      if (errors.length) throw new ValidationError(errors)
+      await this.atomicWrite(abs, next)
+      return { review: parsed, changed: true }
     })
   }
 

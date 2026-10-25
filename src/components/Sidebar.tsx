@@ -1,4 +1,4 @@
-import { AlertTriangle, Moon, Rocket, Sun } from 'lucide-react'
+import { AlertTriangle, Moon, PanelLeftClose, PanelLeftOpen, Rocket, Sun } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useFocusNode } from '../hooks'
 import { matchesQuery } from '../presentation'
@@ -25,7 +25,7 @@ export function Logo() {
 }
 
 export function Sidebar() {
-  const { nodes, docs, projectDiagnostics, connection, compromised, loadError, query, theme, setTheme, openRaw, setInitOpen, view, focusCard } = useProject(
+  const { nodes, docs, projectDiagnostics, connection, compromised, loadError, query, theme, setTheme, collapsed, toggleSidebar, openRaw, setInitOpen, view, focusCard } = useProject(
     useShallow((s) => ({
       nodes: s.nodes,
       docs: s.docs,
@@ -36,6 +36,8 @@ export function Sidebar() {
       query: s.query,
       theme: s.theme,
       setTheme: s.setTheme,
+      collapsed: s.sidebarCollapsed,
+      toggleSidebar: s.toggleSidebar,
       openRaw: s.openRaw,
       setInitOpen: s.setInitOpen,
       view: s.view,
@@ -57,10 +59,20 @@ export function Sidebar() {
       .sort((a, b) => a.data.code.localeCompare(b.data.code))
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
       <div className="sidebar__brand">
         <Logo />
-        <span>Nodit</span>
+        <span className="sidebar__name">Nodit</span>
+        <button
+          type="button"
+          className="icon-btn sidebar__toggle"
+          aria-label={collapsed ? '展開側欄' : '收合側欄'}
+          aria-expanded={!collapsed}
+          title={collapsed ? '展開側欄' : '收合側欄'}
+          onClick={toggleSidebar}
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
 
       <div className="sidebar__scroll">
@@ -68,7 +80,7 @@ export function Sidebar() {
           const items = byKind(kind)
           return (
             <section key={kind} className="sidebar__section">
-              <h2 className="sec-head">
+              <h2 className="sec-head" title={collapsed ? label : undefined}>
                 <span className="sec-head__tag label-caps">{label}</span>
                 <Rule />
                 <span className="mono">{String(items.length).padStart(2, '0')}</span>
@@ -81,6 +93,7 @@ export function Sidebar() {
                     className={`nav-item nav-item--${kind}${n.selected ? ' is-active' : ''}`}
                     aria-current={n.selected ? 'true' : undefined}
                     data-status={n.data.status}
+                    title={collapsed ? `${n.data.code} ${n.data.title || '未命名'}` : undefined}
                     onClick={() => (view === 'graph' ? focus(n.id) : focusCard(n.data.code))}
                   >
                     <KindIcon kind={kind} size={14} />
@@ -95,7 +108,7 @@ export function Sidebar() {
           )
         })}
         <section className="sidebar__section">
-          <h2 className="sec-head">
+          <h2 className="sec-head" title={collapsed ? 'Diagnostics' : undefined}>
             <span className="sec-head__tag label-caps">Diagnostics</span>
             <Rule />
             <span className="mono">{String(diagnostics.length).padStart(2, '0')}</span>
@@ -129,9 +142,9 @@ export function Sidebar() {
       </div>
 
       <footer className="sidebar__foot">
-        <span className="live mono" data-state={compromised || loadError ? 'error' : connection} title={compromised ?? loadError}>
+        <span className="live mono" data-state={compromised || loadError ? 'error' : connection} title={compromised ?? loadError ?? (collapsed ? connection : undefined)}>
           <i />
-          {compromised ? 'writer lost' : loadError ? 'load error' : connection === 'open' ? 'live · 127.0.0.1' : connection}
+          <span className="live__text">{compromised ? 'writer lost' : loadError ? 'load error' : connection === 'open' ? 'live · 127.0.0.1' : connection}</span>
         </span>
         <span className="sidebar__actions">
         <button type="button" className="icon-btn" title="Init / 更新 AI 指令檔" onClick={() => setInitOpen(true)}>

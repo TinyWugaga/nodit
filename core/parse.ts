@@ -20,10 +20,16 @@ import { splitDoc } from './frontmatter'
 import type { ClientDoc, Diagnostic, SectionView } from './protocol'
 import { findHeadings, readSections, type SectionState } from './sections'
 
-export type ParsedDoc = ClientDoc & { sectionStates: Record<string, SectionState> }
+/** `blob` is the SHA-1 git blob hash of the file, compared against a review's `target_rev`. */
+export type ParsedDoc = ClientDoc & { sectionStates: Record<string, SectionState>; blob?: string }
 
 export function sha1(data: string | Buffer) {
   return createHash('sha1').update(data).digest('hex')
+}
+
+/** SHA-1 git blob hash (`git hash-object` in a SHA-1 repository), independent of any repository setting. */
+export function gitBlobHash(buf: Buffer) {
+  return createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex')
 }
 
 export function docKeyOf(relPath: string) {
@@ -71,6 +77,7 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
     path: relPath,
     kind,
     revision: revisionOf(buf),
+    blob: gitBlobHash(buf),
     sectionStates,
     sections: Object.fromEntries(Object.entries(sectionStates).map(([k, v]) => [k, toView(v)])),
     diagnostics,
@@ -168,7 +175,8 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
 }
 
 export function toClientDoc(d: ParsedDoc): ClientDoc {
-  const { sectionStates: _omit, ...rest } = d
+  const { sectionStates: _omit, blob: _blob, ...rest } = d
   void _omit
+  void _blob
   return rest
 }

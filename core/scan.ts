@@ -3,7 +3,8 @@ import path from 'node:path'
 import { CARD_KINDS, LINK_FIELD, type CardKind } from './domain'
 import type { NoditConfig } from './config'
 import { docKeyOf, parseDoc, sha1, type ParsedDoc } from './parse'
-import type { Diagnostic } from './protocol'
+import type { ClientReview, Diagnostic } from './protocol'
+import { parseReview } from './review'
 import { resolveReadable, ScopeError } from './scope'
 
 export const TMP_MARK = '.nodit-tmp-'
@@ -64,6 +65,28 @@ export async function scanDocs(root: string, config: NoditConfig): Promise<Parse
     }
   }
   return docs
+}
+
+export async function scanReviews(root: string, config: NoditConfig): Promise<ClientReview[]> {
+  const out: ClientReview[] = []
+  for (const rel of await listMarkdown(root, config.paths.review)) {
+    try {
+      out.push(parseReview(rel, await readFile(await resolveReadable(root, rel))))
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue
+      const message = err instanceof ScopeError ? err.message : `無法讀取檔案：${(err as Error).message}`
+      out.push({
+        docKey: docKeyOf(rel),
+        path: rel,
+        revision: 'unreadable',
+        targets: [],
+        body: '',
+        diagnostics: [{ level: 'error', code: 'read-failed', message, path: rel }],
+        writable: false,
+      })
+    }
+  }
+  return out
 }
 
 /**

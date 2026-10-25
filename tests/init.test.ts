@@ -56,6 +56,7 @@ describe('init', () => {
       '.claude/skills/nodit-adr/SKILL.md',
       '.claude/skills/nodit-architecture/SKILL.md',
       '.claude/skills/nodit-milestone/SKILL.md',
+      '.claude/skills/nodit-review/SKILL.md',
       '.claude/skills/nodit-task/SKILL.md',
       'AGENTS.md#nodit',
       'CLAUDE.md#nodit',
@@ -121,7 +122,7 @@ describe('init', () => {
     const p = await plan()
     expect(action(p, 'AGENTS.md#nodit')).toBe('skip')
     await applyInit(writer, p, applicable(p))
-    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(6)
+    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(7)
   })
 
   it('does not overwrite a file that appeared between preview and apply', async () => {
@@ -160,6 +161,21 @@ describe('init', () => {
     }
     expect(await read('CLAUDE.md')).toContain('`/nodit-architecture`')
     expect(await read('AGENTS.md')).not.toContain('/nodit-architecture')
+  })
+
+  it('teaches AI the review format in AGENTS.md on its own and in the review skill', async () => {
+    await run()
+    const agents = await read('AGENTS.md')
+    expect(agents).toContain('### Review（AI 評估）')
+    expect(agents).toContain('`docs/reviews/<YYYY-MM-DD>-<第一個目標ID>-<reviewer>-<6位hex>.md`')
+    expect(agents).toContain('set -C')
+    expect(agents).toContain("(printf 'blob %s\\0' \"$(wc -c < FILE | tr -d ' ')\"; cat FILE) | shasum -a 1 | cut -d' ' -f1")
+    expect(agents).not.toContain('/nodit-review')
+    expect(await read('CLAUDE.md')).toContain('`/nodit-review`')
+    const skill = await read('.claude/skills/nodit-review/SKILL.md')
+    expect(skill).toMatch(/^---\nname: nodit-review\ndescription: .+\n# nodit-managed v4\n---\n/)
+    expect(skill).toContain('target_rev:')
+    expect(TEMPLATE_VERSION).toBe(4)
   })
 
   it('renders the configured architecture path into the rules and skill', async () => {

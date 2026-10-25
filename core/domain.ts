@@ -84,6 +84,24 @@ export type CardRecord = {
   links: CardLinks
 }
 
+export const REVIEW_VERDICTS = ['approve', 'changes', 'reject'] as const
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number]
+export const REVIEW_STATUSES = ['open', 'addressed', 'dismissed'] as const
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number]
+
+/** current: reviewed content is what is on disk; unrecorded: the review did not say which content it read */
+export type ReviewTargetState = 'current' | 'stale' | 'unrecorded' | 'missing'
+
+/** Fields of a review file. Values are only guaranteed valid when the review has no error diagnostics. */
+export type ReviewRecord = {
+  targets: string[]
+  reviewer?: string
+  date?: string
+  verdict?: string
+  status?: string
+  targetRev: Record<string, string>
+}
+
 export function kindOfId(id: string): CardKind | undefined {
   return CARD_KINDS.find((k) => ID_RULES[k].pattern.test(id))
 }
