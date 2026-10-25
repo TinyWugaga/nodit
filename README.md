@@ -174,12 +174,14 @@ docs/      本專案自己的決策紀錄
 
 ### 發佈
 
+升哪一位版號、什麼變更要寫進 [CHANGELOG](CHANGELOG.md)，依 [decision 0008](docs/decisions/0008-versioning-and-changelog.md)：0.x 期間破壞性變更與新功能升 minor，修正升 patch。改變使用者可觀察行為的 PR，要在同一個 PR 裡更新 CHANGELOG 的 `[Unreleased]`。
+
 推送 `v<版本號>` 格式的 tag，就會觸發 `.github/workflows/publish.yml` 自動發佈到 npm。CI 透過 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) 以 GitHub OIDC 驗證，GitHub 上不存放 npm token，provenance 也會自動產生。
 
-1. 開一個 PR 升版號（不建立 tag），merge 進 `main`：
+1. 開一個 PR 升版號（不建立 tag），merge 進 `main`。同一個 PR 要把 CHANGELOG 的 `[Unreleased]` 移到新版本區塊、填上日期，並更新檔尾的比較連結：
 
    ```bash
-   npm version patch --no-git-tag-version
+   npm version minor --no-git-tag-version
    ```
 
 2. 在 `main` 的最新 commit 上打 tag 並推送：

@@ -61,7 +61,7 @@
 
 ## 尚未處理
 
-- changelog 流程未定。
+- ~~changelog 流程未定。~~ 已由 [0008](0008-versioning-and-changelog.md) 定案（2026-10-25）。
 - 建議在 npm 套件設定的 Publishing access 改成「Require two-factor authentication and disallow tokens」，讓 token 無法發佈，只留 CI 的 OIDC 與經過 2FA 的手動發佈。
 
 ## 後果
