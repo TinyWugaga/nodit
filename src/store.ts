@@ -9,7 +9,7 @@ import {
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { inferLinkKind, LINK_SCHEMA, shouldReverse, type CardKind, type LinkKind } from '../core/domain'
-import type { ClientDoc, Diagnostic, Envelope, MutationResult, ProjectPayload } from '../core/protocol'
+import type { ClientDoc, ClientReview, Diagnostic, Envelope, MutationResult, ProjectPayload } from '../core/protocol'
 import type { LinkChange, Meta } from './data/client'
 import { DraftManager, type DraftView } from './data/drafts'
 import { HttpProjectClient, SECTION_PREFIX } from './data/httpClient'
@@ -39,6 +39,7 @@ type State = {
   projectName: string
   initialized: boolean
   docs: ClientDoc[]
+  reviews: ClientReview[]
   projectDiagnostics: Diagnostic[]
   layout: Record<string, XYPosition>
   layoutRevision: string
@@ -73,6 +74,12 @@ type State = {
 
   deleteRequest: string | null
   requestDelete: (docKey: string | null) => void
+
+  /** docKey of the review shown in the viewer; it may disappear while open (deleted or renamed) */
+  openReview: string | null
+  setOpenReview: (docKey: string | null) => void
+  /** status applies to the whole review, every target included */
+  setReviewStatus: (docKey: string, status: string) => Promise<boolean>
 
   initOpen: boolean
   setInitOpen: (open: boolean) => void
@@ -257,6 +264,14 @@ export const useProject = create<State>()(
         set({ docs: exists ? docs.map((d) => (d.docKey === env.doc.docKey ? env.doc : d)) : [...docs, env.doc] })
       }
 
+      /** Fold a linked review from a review response in; `null` means the file is gone. */
+      const acceptReview = (env: Envelope<object>, docKey: string, review: ClientReview | null) => {
+        const meta = get().meta
+        if (!meta || env.sessionId !== meta.sessionId || env.rev <= meta.rev) return
+        const rest = get().reviews.filter((r) => r.docKey !== docKey)
+        set({ reviews: review ? [...rest, review].sort((a, b) => a.path.localeCompare(b.path)) : rest })
+      }
+
       const drafts = new DraftManager(
         (docKey, base, patch) => client.patchDoc(docKey, base, patch),
         (_docKey, result) => acceptDoc(result.envelope),
@@ -270,6 +285,7 @@ export const useProject = create<State>()(
           projectName: snap.name,
           initialized: snap.initialized,
           docs: snap.docs,
+          reviews: snap.reviews ?? [],
           projectDiagnostics: snap.diagnostics,
           layout: snap.layout.data,
           layoutRevision: snap.layout.revision,
@@ -359,6 +375,7 @@ export const useProject = create<State>()(
         projectName: '',
         initialized: true,
         docs: [],
+        reviews: [],
         projectDiagnostics: [],
         layout: {},
         layoutRevision: 'absent',
@@ -549,6 +566,25 @@ export const useProject = create<State>()(
         deleteRequest: null,
         requestDelete: (deleteRequest) => set({ deleteRequest }),
 
+        openReview: null,
+        setOpenReview: (openReview) => set({ openReview }),
+        setReviewStatus: async (docKey, status) => {
+          const review = get().reviews.find((r) => r.docKey === docKey)
+          if (!review) return false
+          const result = await client.patchReview(docKey, review.revision, status)
+          if (result.ok) {
+            if (result.envelope.review) acceptReview(result.envelope, docKey, result.envelope.review)
+            else void sync.fetch()
+            return true
+          }
+          if ('envelope' in result) {
+            toast('這份 review 剛被修改，狀態沒有寫入；已載入最新內容')
+            if (result.envelope.current === undefined) void sync.fetch()
+            else acceptReview(result.envelope, docKey, result.envelope.current)
+          } else toast(result.reason === 'invalid' ? (result.diagnostics ?? []).map((d) => d.message).join('；') || result.message : result.message)
+          return false
+        },
+
         view: 'graph',
         setView: (view) => set({ view }),
         architecture: { path: 'docs/ARCHITECTURE.md', revision: 'absent' },
@@ -586,6 +622,8 @@ export const useProject = create<State>()(
           set({
             meta: null,
             docs: [],
+            reviews: [],
+            openReview: null,
             nodes: [],
             edges: [],
             layout: {},

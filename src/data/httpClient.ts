@@ -12,6 +12,7 @@ import type {
   NewCardInput,
   ProjectClient,
   RecentProjects,
+  ReviewResult,
   SubscribeHandlers,
 } from './client'
 import { metaOf } from './sync'
@@ -104,6 +105,13 @@ export class HttpProjectClient implements ProjectClient {
   async createCard(input: NewCardInput): Promise<CreateResult> {
     const r = await this.send('POST', '/api/cards', input)
     return r.status === 201 ? { ok: true, envelope: r.body } : this.failure(r)
+  }
+
+  async patchReview(docKey: string, baseRevision: string, status: string): Promise<ReviewResult> {
+    const r = await this.send('PATCH', `/api/reviews/${docKey}`, { baseRevision, status })
+    if (r.status === 200) return { ok: true, envelope: r.body }
+    if (r.status === 409) return { ok: false, reason: 'conflict', envelope: r.body }
+    return this.failure(r)
   }
 
   async putLayout(baseRevision: string, data: Record<string, { x: number; y: number }>): Promise<LayoutResult> {

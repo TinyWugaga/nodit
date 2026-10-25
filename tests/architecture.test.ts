@@ -15,6 +15,14 @@ describe('architecture renderer', () => {
     expect(html).toContain('<span class="card-ref is-missing" title="找不到這張卡片">ADR-999</span>')
   })
 
+  it('shows task list state without letting input elements through the sanitizer', () => {
+    const { html } = render('- [ ] open\n- [x] done\n  - [X] nested')
+    expect(html).not.toContain('<input')
+    expect(html.match(/data-checked="false"/g)).toHaveLength(1)
+    expect(html.match(/data-checked="true"/g)).toHaveLength(2)
+    expect(html).toContain('aria-label="已完成"')
+  })
+
   it('never links inside code spans, fenced code, existing links or mermaid', () => {
     const { html, mermaid } = render(
       ['`ADR-001`', '', '```ts', 'const x = "T-003"', '```', '', '[see ADR-001](https://example.com)', '', '```mermaid', 'flowchart LR', '  ADR-001 --> MS-01', '```'].join('\n'),

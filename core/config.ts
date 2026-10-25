@@ -7,7 +7,7 @@ import { resolveReadable, ScopeError } from './scope'
 
 export const CONFIG_FILE = 'nodit.config.json'
 
-export type NoditPaths = Record<CardKind, string> & { architecture: string; layout: string }
+export type NoditPaths = Record<CardKind, string> & { architecture: string; layout: string; review: string }
 
 export type NoditConfig = {
   schemaVersion: number
@@ -23,6 +23,7 @@ export const DEFAULT_PATHS: NoditPaths = {
   task: 'docs/tasks',
   architecture: 'docs/ARCHITECTURE.md',
   layout: '.nodit/layout.json',
+  review: 'docs/reviews',
 }
 
 /** Unusable config file: callers that already hold a valid config keep it instead of the fallback. */

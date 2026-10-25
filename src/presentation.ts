@@ -1,4 +1,5 @@
 import type { AdrStatus, CardData, CardKind, LinkKind, MilestoneStatus, Priority, TaskStatus } from './types'
+import type { ReviewTargetState } from '../core/domain'
 
 export const KIND_META: Record<CardKind, { label: string; prefix: string; pad: number }> = {
   adr: { label: 'ADR', prefix: 'ADR-', pad: 3 },
@@ -64,4 +65,19 @@ export const STATUS_RANK: Record<string, number> = {
   active: 2,
   accepted: 3,
   done: 3,
+}
+
+export const VERDICT_META: Record<string, { label: string; tone: 'good' | 'warn' | 'bad' }> = {
+  approve: { label: 'Approve', tone: 'good' },
+  changes: { label: 'Changes', tone: 'warn' },
+  reject: { label: 'Reject', tone: 'bad' },
+}
+
+export const REVIEW_STATUS_LABEL: Record<string, string> = { open: 'Open', addressed: '已處理', dismissed: '已略過' }
+
+export const TARGET_STATE_LABEL: Record<ReviewTargetState, string> = {
+  current: '評估的是目前版本',
+  stale: '評估後已修改',
+  unrecorded: '未記錄版本',
+  missing: '卡片不存在',
 }

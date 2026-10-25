@@ -1,0 +1,28 @@
+# 0007 — AI review 以附屬文件掛在卡片上
+
+- 狀態：Accepted
+- 日期：2026-10-25
+
+## 背景
+
+- 使用者會請 Codex 或 Claude 評估 ADR、Milestone、Task，產出一份 review md。Nodit 原本不認得這類檔案，review 與卡片之間沒有關聯。
+- 一張 ADR 改過幾輪就會累積多份 review。如果把 review 畫成節點，結構圖會被雜訊蓋掉。`CardKind` 也用在十幾處 schema 與 UI，新增第四種卡片的改動面很大。
+
+## 決策
+
+- **附屬文件，不是 `CardKind`**：review 放在 `paths.review`（預設 `docs/reviews/`），不上畫布、不參與連線。卡片顯示 badge，Inspector 列出 reviews，viewer 閱讀全文並改狀態。
+- **關聯寫在 review 端**：`target: [ID…]`。AI 只新增檔案，不修改被評估的卡片。
+- **沒有 ID**：身分用路徑（`docKeyOf`）。檔名 `<日期>-<第一個目標>-<reviewer>-<6位hex>.md`；隨機後綴降低碰撞，不覆寫的保證來自 exclusive create（`set -C` 或 `open(path, 'x')`），不需要 `nodit new` 的編號鎖。
+- **過期判定用 SHA-1 git blob hash**：`target_rev` 記錄 AI 讀到的目標內容指紋，Nodit 對目前檔案算同一個值比對。target 狀態分為 current／stale／unrecorded／missing；沒填 `target_rev` 顯示「未記錄版本」，不視為仍有效。
+  - 演算法固定為 SHA-1，不隨 repo 的 object format 改變。git 2.55 的 `hash-object` 沒有 `--object-format` 參數，在 SHA-256 repo 內會算出不同值，所以 AI 指令提供不依賴 git 的 shell 指令，只有確定是 SHA-1 repo 時才用 `git hash-object --no-filters`。
+  - `target_rev` 必須在讀目標檔時計算。review 寫完後再對最新檔案重算，會把沒審過的修改標成 current。
+- **status 套用整份 review**：`open`／`addressed`／`dismissed`，不做逐 target 狀態。viewer 的按鈕寫明「整份 review」，並列出會一起受影響的卡片。addressed／dismissed 的 review 仍顯示 stale，不自動 reopen。
+- **卡片 badge 只看自己**：只彙總無錯誤且 open 的 reviews，stale 只看這張卡片的 target。格式錯誤的 review 在 Inspector 顯示「格式錯誤」，不參與 verdict 排序與計數。
+- **Findings 在前端解析**：`marked` 是 devDependency，server bundle 用 `--packages=external`，執行期沒有 marked。server 傳完整正文，前端用 marked lexer 計算 `## Findings` 下的 checklist（含巢狀，不計 code fence 內容）。
+- **衍生狀態要觸發變更通知**：卡片修改、刪除、重新建立都會改變 target 狀態，即使 review 檔本身沒變。ProjectService 以連結後的 reviews 整體做 JSON 比對（固定依 path 排序），有差異才遞增 rev。
+
+## 影響
+
+- `TEMPLATE_VERSION` 升為 4：AGENTS.md／CLAUDE.md 加入 Review 規則（Codex 只讀 AGENTS.md，規則必須自給自足），另外新增 `nodit-review` Claude skill。
+- 寫入走既有 Writer queue，能擋下 Nodit 內部的並行寫入，以及寫入開始前已發生的外部修改。外部編輯器若剛好在讀取與 rename 之間存檔，仍可能被覆寫；v1 接受這個限制。
+- review 不能用 raw 編輯器修改，v1 用外部編輯器改檔。逐 target 狀態、finding 轉 Task、Tasks 頁 badge 都不在 v1 範圍。

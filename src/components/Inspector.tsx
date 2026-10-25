@@ -11,6 +11,7 @@ import { useProject } from '../store'
 import type { CardData, CardKind, CardNode, LinkEdge } from '../types'
 import { Rule } from './Frame'
 import { KindIcon } from './KindIcon'
+import { ReviewList } from './ReviewParts'
 
 function Section({ label, aside, children }: { label: string; aside?: ReactNode; children: ReactNode }) {
   return (
@@ -475,6 +476,9 @@ function NodeInspector({ node, onClose }: { node: CardNode; onClose: () => void 
           </div>
         )}
         <CardFields node={node} />
+        <Section label="Reviews">
+          <ReviewList cardId={d.code} />
+        </Section>
         <Connections node={node} />
       </div>
 
@@ -605,7 +609,7 @@ export function Inspector() {
   useEffect(() => {
     if (!expanded || !total) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExpanded(false)
+      if (e.key === 'Escape' && !useProject.getState().openReview) setExpanded(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

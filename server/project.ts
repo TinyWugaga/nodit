@@ -6,8 +6,9 @@ import path from 'node:path'
 import { CONFIG_FILE, CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { CARD_KINDS } from '../core/domain'
 import { sha1, toClientDoc, type ParsedDoc } from '../core/parse'
-import type { ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatus } from '../core/protocol'
-import { crossValidate, readLayout, scanDocs, TMP_MARK, type LayoutFile } from '../core/scan'
+import type { ClientReview, ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatus } from '../core/protocol'
+import { linkReviews } from '../core/review'
+import { crossValidate, readLayout, scanDocs, scanReviews, TMP_MARK, type LayoutFile } from '../core/scan'
 import { resolveReadable } from '../core/scope'
 import { findBlock } from '../core/init'
 import { SKILL_KINDS, skillPath } from '../core/templates'
@@ -28,6 +29,9 @@ export class ProjectService extends EventEmitter {
   private configDiagnostics: Diagnostic[] = []
   private docs = new Map<string, ParsedDoc>()
   private projectDiagnostics: Diagnostic[] = []
+  /** linked against `docs`; always sorted by path so JSON comparison detects real changes only */
+  private reviews: ClientReview[] = []
+  private reviewDiagnostics: Diagnostic[] = []
   private layout: LayoutFile = { revision: 'absent', data: {} }
   private layoutDiagnostics: Diagnostic[] = []
   architectureRevision = 'absent'
@@ -64,6 +68,10 @@ export class ProjectService extends EventEmitter {
     return this.docs.get(docKey)
   }
 
+  getReview(docKey: string) {
+    return this.reviews.find((r) => r.docKey === docKey)
+  }
+
   snapshot(): Envelope<ProjectPayload> {
     return this.envelope({
       name: path.basename(this.root),
@@ -72,9 +80,10 @@ export class ProjectService extends EventEmitter {
       config: this.config,
       status: this.status,
       docs: [...this.docs.values()].map(toClientDoc),
+      reviews: this.reviews,
       layout: this.layout,
       architecture: { path: this.config.paths.architecture, revision: this.architectureRevision },
-      diagnostics: [...this.scanDiagnostics, ...this.configDiagnostics, ...this.layoutDiagnostics, ...this.projectDiagnostics],
+      diagnostics: [...this.scanDiagnostics, ...this.configDiagnostics, ...this.layoutDiagnostics, ...this.projectDiagnostics, ...this.reviewDiagnostics],
     })
   }
 
@@ -96,7 +105,7 @@ export class ProjectService extends EventEmitter {
   }
 
   private watchPaths(config: NoditConfig) {
-    return [...CARD_KINDS.map((k) => config.paths[k]), config.paths.layout, config.paths.architecture, CONFIG_FILE, ...AI_PATHS].map((p) =>
+    return [...CARD_KINDS.map((k) => config.paths[k]), config.paths.review, config.paths.layout, config.paths.architecture, CONFIG_FILE, ...AI_PATHS].map((p) =>
       path.join(this.root, p),
     )
   }
@@ -159,6 +168,9 @@ export class ProjectService extends EventEmitter {
     const changedExtra: string[] = []
     const scanned = (await scanDocs(this.root, config)).map((d) => this.retainCard(d))
     const { docs, diagnostics: cross } = crossValidate(scanned)
+    const linked = linkReviews(await scanReviews(this.root, config), docs)
+    const reviewsChanged = this.setReviews(linked)
+    if (reviewsChanged) changedExtra.push('reviews')
     const { layout, diagnostics: layoutDiag } = await readLayout(this.root, config.paths.layout)
     const architectureRevision = await fileRevision(this.root, config.paths.architecture)
     const architectureChanged = architectureRevision !== this.architectureRevision
@@ -187,10 +199,18 @@ export class ProjectService extends EventEmitter {
     this.scanDiagnostics = []
     if (configChanged) this.updateWatch()
 
-    if (changed.length || layoutChanged || configChanged || architectureChanged || statusChanged || recovered || this.rev === 0) {
+    if (changed.length || layoutChanged || configChanged || architectureChanged || statusChanged || reviewsChanged || recovered || this.rev === 0) {
       this.rev++
       this.emit('change', this.envelope({ changed: [...changed, ...changedExtra] }) satisfies ChangeEvent)
     }
+    return changed
+  }
+
+  /** Returns whether the linked reviews (including derived target states) changed. */
+  private setReviews(linked: { reviews: ClientReview[]; diagnostics: Diagnostic[] }) {
+    const changed = JSON.stringify(linked.reviews) !== JSON.stringify(this.reviews)
+    this.reviews = linked.reviews
+    this.reviewDiagnostics = linked.diagnostics
     return changed
   }
 
@@ -244,6 +264,19 @@ export class ProjectService extends EventEmitter {
     )
   }
 
+  /** Apply a review the writer just persisted; resolves with it linked against the current cards. */
+  applyReviewWritten(review: ClientReview): Promise<ClientReview> {
+    const job = this.scanChain.then(() => {
+      const all = [...this.reviews.filter((r) => r.docKey !== review.docKey), review]
+      this.setReviews(linkReviews(all, [...this.docs.values()]))
+      this.rev++
+      this.emit('change', this.envelope({ changed: ['reviews'] }) satisfies ChangeEvent)
+      return this.getReview(review.docKey)!
+    })
+    this.scanChain = job.catch((err) => this.emit('error', err))
+    return job
+  }
+
   applyDeleted(docKey: string): Promise<void> {
     return this.mutateDocs((all) => all.filter((d) => d.docKey !== docKey), [docKey])
   }
@@ -268,6 +301,8 @@ export class ProjectService extends EventEmitter {
       const before = this.docs
       this.docs = new Map(docs.map((d) => [d.docKey, d]))
       this.projectDiagnostics = diagnostics
+      // a card written or deleted through the UI changes which reviews are stale or dangling
+      if (this.setReviews(linkReviews(this.reviews, docs))) changed.push('reviews')
       for (const [k, d] of this.docs) {
         if (!changed.includes(k) && JSON.stringify(before.get(k)?.diagnostics) !== JSON.stringify(d.diagnostics)) changed.push(k)
       }

@@ -1,5 +1,5 @@
 import type { NoditConfig } from './config'
-import type { CardKind, CardRecord } from './domain'
+import type { CardKind, CardRecord, ReviewRecord, ReviewTargetState } from './domain'
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -26,6 +26,24 @@ export type ClientDoc = {
   writable: boolean
 }
 
+export type ReviewTarget = { id: string; state: ReviewTargetState; docKey?: string }
+
+/**
+ * A review attached to cards. `review` is absent when the targets cannot be read; such a file only
+ * shows up in diagnostics. `targets` is derived from the current cards on every scan.
+ */
+export type ClientReview = {
+  docKey: string
+  path: string
+  revision: string
+  review?: ReviewRecord
+  targets: ReviewTarget[]
+  /** everything after the frontmatter */
+  body: string
+  diagnostics: Diagnostic[]
+  writable: boolean
+}
+
 export type Envelope<T> = { projectId: string; sessionId: string; rev: number } & T
 
 /** Per-component setup state; AI entries are `ok` once init recorded a baseline for them. */
@@ -40,6 +58,7 @@ export type ProjectPayload = {
   config: NoditConfig
   status: ProjectStatus
   docs: ClientDoc[]
+  reviews: ClientReview[]
   layout: { revision: string; data: Record<string, { x: number; y: number }> }
   architecture: { path: string; revision: string }
   diagnostics: Diagnostic[]

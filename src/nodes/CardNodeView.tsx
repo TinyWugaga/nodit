@@ -8,6 +8,7 @@ import { StatusChip } from '../components/StatusChip'
 import { KIND_META, matchesQuery, PRIORITY_LABEL, STATUS_RANK } from '../presentation'
 import { useProject } from '../store'
 import type { AdrStatus, CardNode } from '../types'
+import { ReviewBadge } from '../components/ReviewParts'
 
 const HANDLES = [
   { id: 't', position: Position.Top },
@@ -83,6 +84,7 @@ function CardNodeViewImpl({ id, data, selected }: NodeProps<CardNode>) {
           {data.code}
         </span>
         {selected && <span className="card__selected label-caps">• Selected</span>}
+        <ReviewBadge cardId={data.code} />
         <span className="card__status">
           <StatusDots rank={STATUS_RANK[data.status] ?? 0} />
           <StatusChip kind={data.kind} status={data.status} />

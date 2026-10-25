@@ -9,6 +9,7 @@ import { DeleteDialog, RawEditor, Toast } from './components/Overlays'
 import { ProjectSwitcher, SwitchedAway } from './components/ProjectSwitcher'
 import { isTyping, useFocusNode } from './hooks'
 import { Inspector } from './components/Inspector'
+import { ReviewViewer } from './components/ReviewViewer'
 import { Sidebar } from './components/Sidebar'
 import { Toolbar } from './components/Toolbar'
 import { CardNodeView } from './nodes/CardNodeView'
@@ -191,6 +192,7 @@ export default function App() {
       </div>
       <RawEditor />
       <DeleteDialog />
+      <ReviewViewer />
       <InitPanel />
       <ProjectSwitcher />
       <SwitchedAway />

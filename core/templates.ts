@@ -1,7 +1,7 @@
 import type { NoditConfig } from './config'
-import { STATUSES } from './domain'
+import { REVIEW_STATUSES, REVIEW_VERDICTS, STATUSES } from './domain'
 
-export const TEMPLATE_VERSION = 3
+export const TEMPLATE_VERSION = 4
 
 export const BLOCK_START = (v: number) => `<!-- nodit:start v${v} -->`
 export const BLOCK_END = '<!-- nodit:end -->'
@@ -18,6 +18,36 @@ const CLI_NOTE = [
   '',
   '不要用不帶 `--no` 的 `npx`：本地找不到時，npx 會從 npm 下載套件來執行，下載到的不一定是這個專案用的版本或套件。`nodit` 不可用時才手寫檔案，編號取該資料夾現有最大值 + 1。',
 ]
+
+const BLOB_COMMAND = `(printf 'blob %s\\0' "$(wc -c < FILE | tr -d ' ')"; cat FILE) | shasum -a 1 | cut -d' ' -f1`
+
+function reviewRules(config: NoditConfig): string[] {
+  const p = config.paths
+  return [
+    `- 檔名：\`${p.review}/<YYYY-MM-DD>-<第一個目標ID>-<reviewer>-<6位hex>.md\`，後綴用 \`openssl rand -hex 3\` 產生。`,
+    '- 不得覆寫既有 review。用 exclusive create 寫檔：shell 先 `set -C` 再 `cat > "$FILE" <<\'EOF\'`，或用 `open(path, "x")`；檔案已存在就換後綴重來。',
+    '- 讀目標檔的當下就計算它的指紋，寫進 `target_rev`（把 `FILE` 換成目標檔路徑）：',
+    '',
+    '  ```sh',
+    `  ${BLOB_COMMAND}`,
+    '  ```',
+    '',
+    '  不要在 review 寫完後對最新檔案重算：那會把你沒讀過的修改標成已評估。只有確定 repo 用 SHA-1 時，才能改用 `git hash-object --no-filters FILE`。',
+    '- `status` 一律寫 `open`；之後的處理狀態由人在 Nodit 裡改。不要修改既有 review 的 frontmatter。',
+    '',
+    '| 欄位 | 值 |',
+    '| --- | --- |',
+    '| `type` | `review` |',
+    '| `target` | 目標卡片 ID 陣列，例如 `[ADR-001]` |',
+    '| `reviewer` | 撰寫者，例如 `codex`、`claude` |',
+    '| `date` | `YYYY-MM-DD` |',
+    `| \`verdict\` | ${REVIEW_VERDICTS.map((s) => `\`${s}\``).join(' / ')} |`,
+    `| \`status\` | ${REVIEW_STATUSES.map((s) => `\`${s}\``).join(' / ')} |`,
+    '| `target_rev` | 選填；`卡片 ID: 指紋` 對照表 |',
+    '',
+    '正文寫 `## Summary`（結論）與 `## Findings`（每個問題一個 `- [ ]` 項目，Nodit 會計算未處理數量）。其他段落會原樣顯示。',
+  ]
+}
 
 /** Shared format rules. Rendered separately into each agent file; never imported across files. */
 export function renderRules(config: NoditConfig): string[] {
@@ -71,6 +101,12 @@ export function renderRules(config: NoditConfig): string[] {
     '- `## 專案結構` 放一個 `nodit-tree` 程式碼區塊，它會顯示在 Structure 分頁：每行寫「路徑、兩個以上空白、說明」，縮排兩格表示子層，資料夾以 `/` 結尾。',
     '- 文中的 `ADR-001`、`MS-01`、`T-001` 這類代號會連到卡片，只寫已存在的代號。寫在 code span 或程式碼區塊裡的代號不會變成連結。',
     '- 文件描述現況；還沒定案的方向寫成 ADR。',
+    '',
+    '### Review（AI 評估）',
+    '',
+    `被要求評估 ADR、Milestone 或 Task 時，把結果寫成 \`${config.paths.review}/\` 裡的一份新檔案，Nodit 會把它掛到目標卡片上。`,
+    '',
+    ...reviewRules(config),
   ]
 }
 
@@ -88,7 +124,7 @@ export function renderClaudeBlock(config: NoditConfig) {
     '',
     '### Claude Code skills',
     '',
-    '建立卡片時使用 `/nodit-adr`、`/nodit-milestone`、`/nodit-task`；撰寫或更新架構文件時使用 `/nodit-architecture`。',
+    '建立卡片時使用 `/nodit-adr`、`/nodit-milestone`、`/nodit-task`；撰寫或更新架構文件時使用 `/nodit-architecture`；評估卡片時使用 `/nodit-review`。',
   ])
 }
 
@@ -122,7 +158,7 @@ const SKILL_SPEC = {
   },
 } as const
 
-export const SKILL_KINDS = ['adr', 'milestone', 'task', 'architecture'] as const
+export const SKILL_KINDS = ['adr', 'milestone', 'task', 'architecture', 'review'] as const
 
 export type SkillKind = (typeof SKILL_KINDS)[number]
 
@@ -132,6 +168,7 @@ export function skillPath(kind: SkillKind) {
 
 export function renderSkill(kind: SkillKind, config: NoditConfig) {
   if (kind === 'architecture') return renderArchitectureSkill(config)
+  if (kind === 'review') return renderReviewSkill(config)
   const s = SKILL_SPEC[kind]
   const dir = config.paths[kind]
   return [
@@ -158,6 +195,50 @@ export function renderSkill(kind: SkillKind, config: NoditConfig) {
     '---',
     '',
     ...s.sections.flatMap((x) => [`## ${x}`, '', '…', '']),
+    '```',
+    '',
+  ].join('\n')
+}
+
+function renderReviewSkill(config: NoditConfig) {
+  const p = config.paths
+  return [
+    '---',
+    'name: nodit-review',
+    `description: 被要求評估、審查或 review 這個專案的 ADR、Milestone 或 Task 時使用。把評估結果寫成 ${p.review}/ 裡的新檔案，Nodit 會把它掛到目標卡片上。`,
+    `# nodit-managed v${TEMPLATE_VERSION}`,
+    '---',
+    '',
+    '# 評估卡片（Nodit review 格式）',
+    '',
+    `1. 讀目標卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。讀每個目標檔的同時，用下方「格式」裡的指令算出它的指紋並記下來。`,
+    '2. 評估完成後，依格式建立一份新檔案。不要修改目標卡片本身，也不要修改既有的 review。',
+    '3. 每個問題寫成 `## Findings` 下的一個 `- [ ]` 項目，具體說明問題與建議。',
+    '4. `verdict`：可以直接接受寫 `approve`；需要修改寫 `changes`；方向有根本問題寫 `reject`。',
+    '',
+    '## 格式',
+    '',
+    ...reviewRules(config),
+    '',
+    '```markdown',
+    '---',
+    'type: review',
+    'target: [ADR-001]',
+    'reviewer: claude',
+    'date: 2026-10-25',
+    'verdict: changes',
+    'status: open',
+    'target_rev:',
+    '  ADR-001: 3f2a9c0e5b1d4a7f8e6c2b9d0a1f3e5c7b9d1f2a',
+    '---',
+    '',
+    '## Summary',
+    '',
+    '…',
+    '',
+    '## Findings',
+    '',
+    '- [ ] …',
     '```',
     '',
   ].join('\n')
