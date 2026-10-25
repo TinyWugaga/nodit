@@ -1,7 +1,7 @@
 import type { NoditConfig } from './config'
 import { REVIEW_STATUSES, REVIEW_VERDICTS, STATUSES } from './domain'
 
-export const TEMPLATE_VERSION = 5
+export const TEMPLATE_VERSION = 6
 
 export const BLOCK_START = (v: number) => `<!-- nodit:start v${v} -->`
 export const BLOCK_END = '<!-- nodit:end -->'
@@ -45,7 +45,12 @@ function reviewRules(config: NoditConfig): string[] {
     `| \`status\` | ${REVIEW_STATUSES.map((s) => `\`${s}\``).join(' / ')} |`,
     '| `target_rev` | 選填；`卡片 ID: 指紋` 對照表 |',
     '',
-    '正文寫 `## Summary`（結論）與 `## Findings`（每個問題一個 `- [ ]` 項目，Nodit 會計算未處理數量）。其他段落會原樣顯示。',
+    '正文寫 `## Summary`（結論）與 `## Findings`：',
+    '',
+    '- 要求修改、補充或做決定的事項，一律寫成 `## Findings` 底下的 `- [ ]` 項目，不論它是否阻擋其他工作。Nodit 只計算、追蹤 `## Findings` 裡的項目，處理 review 的人也只會逐條處理這些項目。',
+    '- 優先序與期限寫在項目開頭，例如 `- [ ] **P1**（期限：ADR 接受前）…`。優先序只決定先後，不決定要不要列成 finding。',
+    '- 需要分組時，在 `## Findings` 底下用 `###` 小標，例如「阻擋 P0」「不阻擋 P0」，不要另開 `##` 段落。',
+    '- 其他段落只放背景、已解決項目的核對、不需要修改的建議，不能放未列入 Findings 的修改要求。',
   ]
 }
 
@@ -55,14 +60,15 @@ function resolveRules(config: NoditConfig): string[] {
   return [
     `範圍：指定了 review 檔就處理那一份。只說「處理 review」時，處理 \`${p.review}/\` 裡 \`status: open\`、格式正確、還有未勾選 finding 的 review；指定卡片 ID 時只處理 \`target\` 含那張卡片的。\`addressed\`、\`dismissed\` 的 review 不處理；格式錯誤的 review 不處理，在回覆裡列出路徑。`,
     '',
-    `1. 讀 review 的 frontmatter、Summary 與 Findings，再讀 \`target\` 列出的每張卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。`,
-    '2. 逐條處理 Findings 裡還沒勾選的 `- [ ]` 項目：',
+    `1. 讀整份 review：frontmatter 與完整正文，不只 Summary 與 Findings。再讀 \`target\` 列出的每張卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。`,
+    '2. 檢查 `## Findings` 以外的段落。發現疑似修改要求時（其他段落裡的 checklist，或要求修改、補充、決定的句子）：不要當成 finding 處理，也不要略過，更不要替評估者搬進 Findings。在回覆裡另外列成「Findings 以外的修改要求」，附上段落名稱與原文，請人決定要不要納入。',
+    '3. 逐條處理 `## Findings` 裡還沒勾選的 `- [ ]` 項目，包括 `###` 小標底下的項目：',
     '   - 同意的：修改目標卡片。只動相關的欄位或段落，不要重排整份檔案，不要改 `id`。',
     '   - 需要另外開工作的：用 `nodit new task "<標題>" --implements <目標ID>` 建 Task，不要硬塞進現有卡片。專案把 Nodit 裝成 devDependency 時改用 `npx --no nodit`；兩者都不可用時，照 Task 格式手寫，編號取現有最大值 + 1。',
     '   - 不同意的：不要改卡片，在回覆裡說明理由。',
-    '3. 已處理的項目，在 review 正文把 `- [ ]` 改成 `- [x]`，並在同一行後面補一句做了什麼。不同意的項目保持未勾選。',
-    '4. 不要修改 review 的 frontmatter，特別是 `status` 和 `target_rev`：`status` 由人在 Nodit 裡改，`target_rev` 要保留原本評估時的版本。修改過的卡片在 Nodit 會顯示「評估後已修改」，這是預期結果。',
-    '5. 完成後列出：每份 review 的每條 finding 怎麼處理（已修改／已開 Task／不同意）、改了哪些檔案、還有哪些需要人決定。',
+    '4. 已處理的項目，在 review 正文把 `- [ ]` 改成 `- [x]`，並在同一行後面補一句做了什麼。不同意的項目保持未勾選。',
+    '5. 不要修改 review 的 frontmatter，特別是 `status` 和 `target_rev`：`status` 由人在 Nodit 裡改，`target_rev` 要保留原本評估時的版本。修改過的卡片在 Nodit 會顯示「評估後已修改」，這是預期結果。',
+    '6. 完成後列出：每份 review 的每條 finding 怎麼處理（已修改／已開 Task／不同意）、Findings 以外的修改要求、改了哪些檔案、還有哪些需要人決定。',
   ]
 }
 
@@ -267,7 +273,7 @@ function renderReviewSkill(config: NoditConfig) {
     '',
     `1. 讀目標卡片（\`${p.adr}/\`、\`${p.milestone}/\`、\`${p.task}/\`）與相關程式碼。讀每個目標檔的同時，用下方「格式」裡的指令算出它的指紋並記下來。`,
     '2. 評估完成後，依格式建立一份新檔案。評估時不要修改目標卡片本身，也不要修改既有的 review；要處理既有 review 的 findings 時改用 `/nodit-review-resolve`。',
-    '3. 每個問題寫成 `## Findings` 下的一個 `- [ ]` 項目，具體說明問題與建議。',
+    '3. 每個要求修改、補充或做決定的事項，都寫成 `## Findings` 底下的一個 `- [ ]` 項目，具體說明問題與建議；優先序與期限寫在項目開頭。其他段落不放修改要求。',
     '4. `verdict`：可以直接接受寫 `approve`；需要修改寫 `changes`；方向有根本問題寫 `reject`。',
     '',
     '## 格式',
@@ -292,7 +298,13 @@ function renderReviewSkill(config: NoditConfig) {
     '',
     '## Findings',
     '',
-    '- [ ] …',
+    '### 阻擋 P0',
+    '',
+    '- [ ] **P0** …',
+    '',
+    '### 不阻擋 P0',
+    '',
+    '- [ ] **P1**（期限：ADR 接受前）…',
     '```',
     '',
   ].join('\n')

@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- AI 模板升到 `TEMPLATE_VERSION` 6，review 的修改要求不會再藏在 Findings 以外。
+  - 寫 review 時，所有要求修改、補充或做決定的事項，都要寫成 `## Findings` 底下的 `- [ ]` 項目。優先序與期限標在項目開頭，需要分組時用 `###`。
+  - 處理 review 時，AI 會讀完整份正文；Findings 以外的修改要求會另外列出來請你決定，不會靜默略過。
+  - 已 init 的專案重跑 `nodit init` 即可取得。
+
 ## [0.5.0] - 2026-10-25
 
 ### Added

@@ -195,7 +195,29 @@ describe('init', () => {
     expect(skill).toMatch(/^---\nname: nodit-review-resolve\ndescription: .+\n# nodit-managed v\d+\n---\n/)
     expect(skill).toContain('`docs/reviews/`')
     expect(skill).toContain('- [x] 補上效能門檻。')
-    expect(TEMPLATE_VERSION).toBe(5)
+    expect(TEMPLATE_VERSION).toBe(6)
+  })
+
+  it('keeps every change request inside Findings and surfaces the ones that are not', async () => {
+    await run()
+    for (const file of ['AGENTS.md', 'CLAUDE.md']) {
+      const text = await read(file)
+      expect(text).toContain('一律寫成 `## Findings` 底下的 `- [ ]` 項目，不論它是否阻擋其他工作')
+      expect(text).toContain('優先序只決定先後，不決定要不要列成 finding')
+      expect(text).toContain('在 `## Findings` 底下用 `###` 小標')
+      expect(text).toContain('不能放未列入 Findings 的修改要求')
+      expect(text).toContain('讀整份 review：frontmatter 與完整正文，不只 Summary 與 Findings')
+      expect(text).toContain('不要當成 finding 處理，也不要略過，更不要替評估者搬進 Findings')
+      expect(text).toContain('包括 `###` 小標底下的項目')
+      expect(text).toContain('Findings 以外的修改要求、改了哪些檔案')
+      expect(text).not.toContain('讀 review 的 frontmatter、Summary 與 Findings')
+    }
+    const skill = await read('.claude/skills/nodit-review/SKILL.md')
+    expect(skill).toContain('其他段落不放修改要求')
+    expect(skill).toContain('### 不阻擋 P0')
+    expect(skill).toContain('- [ ] **P1**（期限：ADR 接受前）…')
+    const resolve = await read('.claude/skills/nodit-review-resolve/SKILL.md')
+    expect(resolve).toContain('Findings 以外的修改要求')
   })
 
   it('renders the configured architecture path into the rules and skill', async () => {
