@@ -5,7 +5,7 @@
 - **Graph Canvas**：卡片、連線、拖曳排版、Inspector 編輯、診斷面板。
 - **Architecture**：渲染 `docs/ARCHITECTURE.md`，支援 mermaid，文中的 `ADR-001`、`MS-01`、`T-001` 會自動連到卡片。
 - **init**：產生設定檔與資料夾，並在 AGENTS.md、CLAUDE.md 加入格式規則，另外建立 Claude Code skills，讓 AI 照 Nodit 的格式寫卡片，並補完、維護 `docs/ARCHITECTURE.md`（`/nodit-architecture`）。
-- **AI review**：請 Codex 或 Claude 評估卡片時，結果寫成 `docs/reviews/` 裡的 review 檔（`/nodit-review`）。Nodit 會把它掛到目標卡片上：卡片顯示未處理數量，Inspector 列出 reviews，可以閱讀全文、標記整份已處理；目標卡片在 review 後被修改時會標示過期。
+- **AI review**：請 Codex 或 Claude 評估卡片時，結果寫成 `docs/reviews/` 裡的 review 檔（`/nodit-review`）；之後直接說「處理 review」，AI 會依未勾選的 findings 修改卡片或開 Task，並勾選已處理的項目（`/nodit-review-resolve`）。Nodit 會把它掛到目標卡片上：卡片顯示未處理數量，Inspector 列出 reviews，可以閱讀全文、標記整份已處理；目標卡片在 review 後被修改時會標示過期。
 
 ## 需求
 

@@ -56,6 +56,7 @@ describe('init', () => {
       '.claude/skills/nodit-adr/SKILL.md',
       '.claude/skills/nodit-architecture/SKILL.md',
       '.claude/skills/nodit-milestone/SKILL.md',
+      '.claude/skills/nodit-review-resolve/SKILL.md',
       '.claude/skills/nodit-review/SKILL.md',
       '.claude/skills/nodit-task/SKILL.md',
       'AGENTS.md#nodit',
@@ -122,7 +123,7 @@ describe('init', () => {
     const p = await plan()
     expect(action(p, 'AGENTS.md#nodit')).toBe('skip')
     await applyInit(writer, p, applicable(p))
-    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(7)
+    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(8)
   })
 
   it('does not overwrite a file that appeared between preview and apply', async () => {
@@ -173,9 +174,28 @@ describe('init', () => {
     expect(agents).not.toContain('/nodit-review')
     expect(await read('CLAUDE.md')).toContain('`/nodit-review`')
     const skill = await read('.claude/skills/nodit-review/SKILL.md')
-    expect(skill).toMatch(/^---\nname: nodit-review\ndescription: .+\n# nodit-managed v4\n---\n/)
+    expect(skill).toMatch(/^---\nname: nodit-review\ndescription: .+\n# nodit-managed v\d+\n---\n/)
     expect(skill).toContain('target_rev:')
-    expect(TEMPLATE_VERSION).toBe(4)
+    expect(skill).toContain('評估時不要修改目標卡片本身，也不要修改既有的 review')
+  })
+
+  it('teaches AI how to resolve open reviews without touching their frontmatter', async () => {
+    await run()
+    for (const file of ['AGENTS.md', 'CLAUDE.md']) {
+      const text = await read(file)
+      expect(text).toContain('### 處理 review')
+      expect(text).toContain('`status: open`、格式正確、還有未勾選 finding 的 review')
+      expect(text).toContain('把 `- [ ]` 改成 `- [x]`')
+      expect(text).toContain('不要修改 review 的 frontmatter，特別是 `status` 和 `target_rev`')
+      expect(text).toContain('nodit new task "<標題>" --implements <目標ID>')
+    }
+    expect(await read('CLAUDE.md')).toContain('`/nodit-review-resolve`')
+    expect(await read('AGENTS.md')).not.toContain('/nodit-review-resolve')
+    const skill = await read('.claude/skills/nodit-review-resolve/SKILL.md')
+    expect(skill).toMatch(/^---\nname: nodit-review-resolve\ndescription: .+\n# nodit-managed v\d+\n---\n/)
+    expect(skill).toContain('`docs/reviews/`')
+    expect(skill).toContain('- [x] 補上效能門檻。')
+    expect(TEMPLATE_VERSION).toBe(5)
   })
 
   it('renders the configured architecture path into the rules and skill', async () => {

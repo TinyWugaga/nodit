@@ -181,10 +181,10 @@ export function ReviewViewer() {
               {meta?.status === 'open' || !valid ? (
                 <>
                   <button type="button" className="btn" disabled={!valid || busy} onClick={() => void setStatus('dismissed')}>
-                    略過整份 review
+                    略過整份
                   </button>
                   <button type="button" className="btn btn--primary" disabled={!valid || busy} onClick={() => void setStatus('addressed')}>
-                    將整份 review 標記為已處理
+                    標記為已處理
                   </button>
                 </>
               ) : (

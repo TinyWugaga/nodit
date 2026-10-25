@@ -2323,7 +2323,7 @@ button.link-row:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--sp-xs);
+  gap: var(--sp-sm);
 }
 .modal__foot > :first-child {
   margin-right: auto;

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- 可以直接請 AI「處理 review」：AI 會依 open review 未勾選的 findings 修改目標卡片或開 Task，在 review 正文勾選已處理的項目並註明做了什麼，不改 review 的 `status` 與 `target_rev`。Claude 可用 `/nodit-review-resolve`。
+
+### Changed
+
+- AI 模板升到 `TEMPLATE_VERSION` 5：AGENTS.md／CLAUDE.md 的 Review 規則加入「處理 review」流程，並新增 `nodit-review-resolve` Claude skill。已 init 的專案重跑 `nodit init` 即可取得。
+
 ## [0.4.0] - 2026-10-25
 
 ### Added
