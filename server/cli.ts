@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
@@ -24,7 +24,9 @@ nodit new <adr|milestone|task> "<title>" [options]
     --supersedes <ADR-ID>    可重複（新 ADR 取代舊 ADR）
     --relates <ID>           可重複
     --json                   以 JSON 輸出結果
-nodit import <file.json> [dir]       匯入舊版 localStorage 匯出（nodit:project）；中斷後用同一個檔案重跑即可續跑`
+nodit import <file.json> [dir]       匯入舊版 localStorage 匯出（nodit:project）；中斷後用同一個檔案重跑即可續跑
+nodit --version | -v                 顯示版本
+nodit --help | -h                    顯示這份說明`
 
 class CliError extends Error {
   constructor(
@@ -37,20 +39,42 @@ class CliError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/** Anything unrecognized is an error: a typo must never start a server and take a folder's writer lock. */
 function parseServeArgs(argv: string[]) {
   const args = { dir: '.', port: 4319, devOrigins: [] as string[], browseRoot: undefined as string | undefined }
+  let hasDir = false
+  const value = (flag: string, v: string | undefined) => {
+    if (v === undefined || v.startsWith('-')) throw new CliError(`${flag} 需要一個值\n\n${HELP}`)
+    return v
+  }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--port') args.port = Number(argv[++i])
-    else if (a === '--browse-root') args.browseRoot = path.resolve(argv[++i])
-    else if (a === '--dev-origin') args.devOrigins.push(argv[++i])
-    else if (!a.startsWith('-')) args.dir = a
+    if (a === '--port') {
+      const v = value(a, argv[++i])
+      if (!/^\d+$/.test(v) || Number(v) > 65535) throw new CliError(`--port 必須是 0–65535 的整數：${v}`)
+      args.port = Number(v)
+    } else if (a === '--browse-root') args.browseRoot = path.resolve(value(a, argv[++i]))
+    else if (a === '--dev-origin') args.devOrigins.push(value(a, argv[++i]))
+    else if (a.startsWith('-')) throw new CliError(`不認得的參數：${a}\n\n${HELP}`)
+    else if (hasDir) throw new CliError(`多餘的參數：${a}\n\n${HELP}`)
+    else {
+      args.dir = a
+      hasDir = true
+    }
   }
   return args
 }
 
+async function packageVersion() {
+  // server/cli.ts in development, dist-server/cli.mjs when installed: both sit next to package.json's folder
+  const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../package.json')
+  return (JSON.parse(await readFile(file, 'utf8')) as { version: string }).version
+}
+
 async function serve(argv: string[]) {
   const args = parseServeArgs(argv)
+  const dir = await stat(path.resolve(args.dir)).catch(() => null)
+  if (!dir?.isDirectory()) throw new CliError(`找不到目錄：${args.dir}（子指令只有 init、new、import）\n\n${HELP}`)
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
   const running = await start({
     root: args.dir,
@@ -281,6 +305,7 @@ async function cmdImport(argv: string[]) {
 async function main() {
   const [cmd, ...rest] = process.argv.slice(2)
   if (cmd === '--help' || cmd === '-h' || cmd === 'help') return console.log(HELP)
+  if (cmd === '--version' || cmd === '-v') return console.log(await packageVersion())
   if (cmd === 'new') return cmdNew(rest)
   if (cmd === 'init') return cmdInit(rest)
   if (cmd === 'import') return cmdImport(rest)

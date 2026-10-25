@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readdir, rm, stat, utimes } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, utimes } from 'node:fs/promises'
 import { createServer, type Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -167,3 +167,45 @@ describe('nodit init', () => {
   }, 30_000)
 })
 
+
+describe('nodit arguments', () => {
+  // a mistaken server start would block until killed; the timeout turns that into a failure
+  function quick(...args: string[]) {
+    return run(TSX, [CLI, ...args], { cwd: REPO, timeout: 15_000 }).then(
+      (r) => ({ code: 0 as number | null, out: r.stdout.trim(), err: r.stderr.trim() }),
+      (e) => ({ code: e.code as number | null, out: String(e.stdout).trim(), err: String(e.stderr).trim() }),
+    )
+  }
+  const locked = () =>
+    stat(lockPaths(root).owner).then(
+      () => true,
+      () => false,
+    )
+
+  it('prints the package version for --version and -v', async () => {
+    const { version } = JSON.parse(await readFile(path.join(REPO, 'package.json'), 'utf8'))
+    for (const flag of ['--version', '-v']) {
+      const r = await quick(flag)
+      expect(r).toMatchObject({ code: 0, out: version })
+    }
+  }, 30_000)
+
+  it('refuses unknown or malformed arguments without starting a server or taking the lock', async () => {
+    const cases: [string[], RegExp][] = [
+      [[root, '--nope'], /不認得的參數：--nope/],
+      [[root, '-x'], /不認得的參數：-x/],
+      [[root, 'extra'], /多餘的參數：extra/],
+      [[root, '--port'], /--port 需要一個值/],
+      [[root, '--port', 'abc'], /--port 必須是 0–65535 的整數：abc/],
+      [[root, '--port', '70000'], /--port 必須是 0–65535 的整數：70000/],
+      [[root, '--browse-root', '--port'], /--browse-root 需要一個值/],
+      [[path.join(root, 'innit')], /找不到目錄：.*innit/],
+    ]
+    for (const [args, message] of cases) {
+      const r = await quick(...args)
+      expect(r.code, args.join(' ')).toBe(1)
+      expect(r.err).toMatch(message)
+    }
+    expect(await locked()).toBe(false)
+  }, 60_000)
+})
