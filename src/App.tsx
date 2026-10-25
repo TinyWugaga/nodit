@@ -12,6 +12,7 @@ import { Inspector } from './components/Inspector'
 import { ReviewViewer } from './components/ReviewViewer'
 import { Sidebar } from './components/Sidebar'
 import { Toolbar } from './components/Toolbar'
+import { ViewBoundary } from './components/ViewBoundary'
 import { CardNodeView } from './nodes/CardNodeView'
 import { LinkEdgeView, LinkMarkers } from './nodes/LinkEdgeView'
 import { useProject } from './store'
@@ -169,22 +170,24 @@ export default function App() {
         <div className="workspace">
           <Header />
           <main className="stage">
-            {view === 'graph' ? (
-              <>
-                <Canvas key={canvasEpoch} />
-                <Toolbar />
-                <Inspector />
-              </>
-            ) : view === 'tasks' ? (
-              <Suspense fallback={null}>
-                <TasksPage />
-                <Inspector />
-              </Suspense>
-            ) : (
-              <Suspense fallback={null}>
-                <ArchitecturePage />
-              </Suspense>
-            )}
+            <ViewBoundary key={view}>
+              {view === 'graph' ? (
+                <>
+                  <Canvas key={canvasEpoch} />
+                  <Toolbar />
+                  <Inspector />
+                </>
+              ) : view === 'tasks' ? (
+                <Suspense fallback={null}>
+                  <TasksPage />
+                  <Inspector />
+                </Suspense>
+              ) : (
+                <Suspense fallback={null}>
+                  <ArchitecturePage />
+                </Suspense>
+              )}
+            </ViewBoundary>
             <StatusBanner />
             <Toast />
           </main>

@@ -199,10 +199,10 @@ export function ArchitecturePage() {
           </div>
         )}
         {rendered && tab === 'contents' && (
-          <div ref={body} className="arch__body" onClick={onClick} dangerouslySetInnerHTML={{ __html: rendered.html }} />
+          <div ref={body} className="arch__body prose" onClick={onClick} dangerouslySetInnerHTML={{ __html: rendered.html }} />
         )}
         {rendered && tab === 'structure' && (
-          <div ref={body} className="arch__body" onClick={onClick}>
+          <div ref={body} className="arch__body prose" onClick={onClick}>
             {trees.length ? (
               roots.map((n, i) => (
                 <ul key={`${n.name}-${i}`} id={`tree-${i}`} className="tree" role="tree">
