@@ -60,6 +60,9 @@ nodit
 | `nodit init [dir] [--no-ai] [--yes] [--dry-run]` | 初始化：`nodit.config.json`、卡片資料夾、`docs/ARCHITECTURE.md`、`.gitignore`，以及 AI 指令檔與 skills（`--no-ai` 時略過） |
 | `nodit new <adr\|milestone\|task> "<標題>" [選項]` | 新建卡片並配發不重複的編號 |
 | `nodit import <file.json> [dir]` | 匯入舊版 localStorage 匯出的 JSON |
+| `nodit --version`、`nodit -v` | 顯示版本 |
+
+不認得的參數、多餘的參數、不存在的目錄都會直接報錯，不會啟動 server。
 
 `nodit new` 的選項：
 

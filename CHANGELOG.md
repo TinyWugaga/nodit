@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- `nodit --version`（`-v`）顯示安裝的版本。
+
+### Changed
+
+- `nodit` 遇到不認得的參數、多餘的參數、缺值或不合法的 `--port`、不存在的目錄時，會報錯並以 exit code 1 結束，不再啟動 server。原本 `nodit --version` 這類打錯的參數會被忽略，直接在目前目錄啟動 server 並取得寫入鎖。
+
 ## [0.3.0] - 2026-10-25
 
 ### Added
