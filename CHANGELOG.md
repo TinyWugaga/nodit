@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
 ### Added
 
 - 可以直接請 AI「處理 review」：AI 會依 open review 未勾選的 findings 修改目標卡片或開 Task，在 review 正文勾選已處理的項目並註明做了什麼，不改 review 的 `status` 與 `target_rev`。Claude 可用 `/nodit-review-resolve`。
@@ -11,6 +13,7 @@
 ### Changed
 
 - AI 模板升到 `TEMPLATE_VERSION` 5：AGENTS.md／CLAUDE.md 的 Review 規則加入「處理 review」流程，並新增 `nodit-review-resolve` Claude skill。已 init 的專案重跑 `nodit init` 即可取得。
+- review viewer 的狀態按鈕改成「標記為已處理」「略過整份」；影響多張卡片時，footer 仍會列出「同時套用到 …」。所有對話框底部按鈕的間距加大。
 
 ## [0.4.0] - 2026-10-25
 
@@ -78,7 +81,8 @@
 - 匯入舊版 localStorage JSON，可中斷後繼續。
 - 寫入鎖：同一個專案只允許一個 Nodit server 寫入。
 
-[Unreleased]: https://github.com/TinyWugaga/nodit/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/TinyWugaga/nodit/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/TinyWugaga/nodit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/TinyWugaga/nodit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/TinyWugaga/nodit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/TinyWugaga/nodit/compare/v0.1.1...v0.2.0
