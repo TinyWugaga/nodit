@@ -1148,6 +1148,57 @@ kbd {
 .input--area:focus {
   color: var(--ink);
 }
+
+.md-preview {
+  padding: var(--sp-sm) 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  background: var(--container);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.md-preview > :last-child {
+  margin-bottom: 0;
+}
+.md-preview h1,
+.md-preview h2,
+.md-preview h3,
+.md-preview h4 {
+  margin: 16px 0 6px;
+  font-size: 15px;
+}
+.md-preview h2::before,
+.md-preview h2::after {
+  display: none;
+}
+.md-preview p,
+.md-preview ul,
+.md-preview ol,
+.md-preview pre.code,
+.md-preview blockquote,
+.md-preview table {
+  margin-bottom: 10px;
+}
+.md-preview ul,
+.md-preview ol {
+  padding-left: 20px;
+}
+.md-preview code {
+  background: var(--high);
+}
+.md-preview pre.code {
+  padding: 10px 12px;
+}
+.md-preview .mermaid-block::before {
+  content: 'Mermaid 圖表，請以 edit raw 檢視';
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.md-preview--empty {
+  color: var(--ink-3);
+}
 select.input {
   appearance: none;
   padding-right: 28px;
@@ -2570,31 +2621,31 @@ button.link-row:hover {
   font-size: 15px;
   line-height: 1.75;
 }
-.arch__body > :first-child {
+.prose > :first-child {
   margin-top: 0;
 }
-.arch__body h1,
-.arch__body h2,
-.arch__body h3,
-.arch__body h4 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
   color: var(--ink);
   font-family: var(--font-head);
   letter-spacing: -0.015em;
   scroll-margin-top: 24px;
 }
-.arch__body h1 {
+.prose h1 {
   margin: 0 0 24px;
   font-size: 34px;
   line-height: 1.2;
 }
-.arch__body h2 {
+.prose h2 {
   display: flex;
   align-items: center;
   gap: 12px;
   margin: 40px 0 12px;
   font-size: 22px;
 }
-.arch__body h2::before {
+.prose h2::before {
   content: '';
   width: 10px;
   height: 10px;
@@ -2602,34 +2653,34 @@ button.link-row:hover {
   background: var(--accent);
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
-.arch__body h2::after {
+.prose h2::after {
   content: '';
   flex: 1;
   height: 1px;
   background: var(--line);
 }
-.arch__body h3 {
+.prose h3 {
   margin: 28px 0 8px;
   font-size: 17px;
 }
-.arch__body p,
-.arch__body ul,
-.arch__body ol {
+.prose p,
+.prose ul,
+.prose ol {
   margin: 0 0 14px;
 }
-.arch__body li + li {
+.prose li + li {
   margin-top: 4px;
 }
-.arch__body strong {
+.prose strong {
   color: var(--ink);
 }
-.arch__body a {
+.prose a {
   color: var(--accent-text);
   text-decoration: underline;
   text-decoration-color: color-mix(in oklab, var(--accent) 40%, transparent);
   text-underline-offset: 3px;
 }
-.arch__body code {
+.prose code {
   padding: 1px 6px;
   border-radius: var(--r-sm);
   background: var(--container);
@@ -2637,52 +2688,52 @@ button.link-row:hover {
   font-family: var(--font-mono);
   font-size: 0.86em;
 }
-.arch__body pre.code {
+.prose pre.code {
   margin: 0 0 16px;
   padding: 14px 16px;
   overflow-x: auto;
   border-left: 2px solid var(--line);
   background: var(--lowest);
 }
-.arch__body pre.code code {
+.prose pre.code code {
   padding: 0;
   background: none;
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1.6;
 }
-.arch__body blockquote {
+.prose blockquote {
   margin: 0 0 16px;
   padding: 8px 16px;
   border-left: 2px solid var(--peach);
   background: var(--container);
   color: var(--ink-2);
 }
-.arch__body table {
+.prose table {
   width: 100%;
   margin: 0 0 16px;
   border-collapse: collapse;
   font-size: 14px;
 }
-.arch__body th,
-.arch__body td {
+.prose th,
+.prose td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--line-soft);
   text-align: left;
 }
-.arch__body th {
+.prose th {
   color: var(--ink-3);
   font-family: var(--font-mono);
   font-size: 12px;
   text-transform: uppercase;
 }
-.arch__body hr {
+.prose hr {
   margin: 32px 0;
   border: 0;
   border-top: 1px dashed var(--line);
 }
 
-.arch__body .card-ref {
+.prose .card-ref {
   display: inline-flex;
   align-items: center;
   padding: 0 8px 0 6px;
@@ -2696,11 +2747,11 @@ button.link-row:hover {
   vertical-align: 1px;
   transition: background 0.15s, color 0.15s;
 }
-.arch__body a.card-ref:hover {
+.prose a.card-ref:hover {
   background: var(--accent);
   color: var(--on-accent);
 }
-.arch__body .card-ref.is-missing {
+.prose .card-ref.is-missing {
   background: transparent;
   color: var(--ink-3);
   text-decoration: line-through;
@@ -3345,6 +3396,10 @@ button.tree__toggle {
   .help__toc {
     display: none;
   }
+}
+
+.view-error {
+  padding: 36px 48px;
 }
 
 /* ---------- reviews ---------- */

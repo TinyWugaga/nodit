@@ -7,10 +7,16 @@
 ### Added
 
 - `nodit --version`（`-v`）顯示安裝的版本。
+- 頁面載入失敗或某個頁面出錯時，只在該頁顯示錯誤訊息與「重新載入」按鈕，不會讓整個 Nodit 變成空白。
 
 ### Changed
 
 - `nodit` 遇到不認得的參數、多餘的參數、缺值或不合法的 `--port`、不存在的目錄時，會報錯並以 exit code 1 結束，不再啟動 server。原本 `nodit --version` 這類打錯的參數會被忽略，直接在目前目錄啟動 server 並取得寫入鎖。
+- Inspector 的段落（ADR 的 Context、Decision、Consequences，Milestone 的 Goal，Task 的 Description）改成 Markdown 預覽，卡片代號與外部連結可以點。段落不能再直接在 Inspector 打字，要修改時按段落旁的 `edit raw`。
+
+### Fixed
+
+- review viewer 的正文會正確顯示標題、段落、清單的排版。0.3.0 的正文沒有套到這些樣式。
 
 ## [0.3.0] - 2026-10-25
 

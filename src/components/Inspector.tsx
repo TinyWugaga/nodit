@@ -1,7 +1,9 @@
 import { AlertTriangle, ArrowLeftRight, ArrowRight, Crosshair, FileCode2, Link2, Maximize2, Minimize2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import DOMPurify from 'dompurify'
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { inferLinkKind, LINK_SCHEMA, shouldReverse, type LinkKind } from '../../core/domain'
+import { renderMarkdown } from '../architecture/render'
 import type { DraftView } from '../data/drafts'
 import { SECTION_PREFIX } from '../data/httpClient'
 import { CARD_W, useAddCard, useFocusNode } from '../hooks'
@@ -58,34 +60,44 @@ function Select<T extends string>({
 }
 
 function SectionText({ d, name, label, value, placeholder }: { d: CardData; name: string; label: string; value: string; placeholder: string }) {
-  const { editField, openRaw } = useProject(useShallow((s) => ({ editField: s.editField, openRaw: s.openRaw })))
+  const { docs, focusCard, openRaw } = useProject(useShallow((s) => ({ docs: s.docs, focusCard: s.focusCard, openRaw: s.openRaw })))
+  const known = useMemo(() => new Set(docs.flatMap((x) => (x.card ? [x.card.id] : []))), [docs])
+  const html = useMemo(() => (value.trim() ? renderMarkdown(value, known, DOMPurify).html : ''), [value, known])
   const state = d.sectionStates[name] ?? 'missing'
   const locked = state !== 'ok'
+
+  const onClick = (e: MouseEvent<HTMLElement>) => {
+    const a = (e.target as HTMLElement).closest('a')
+    if (!a) return
+    e.preventDefault()
+    const card = a.getAttribute('data-card')
+    const href = a.getAttribute('href') ?? ''
+    if (card) focusCard(card)
+    else if (/^https?:/i.test(href)) window.open(href, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <Section
       label={label}
       aside={
         locked ? (
           <button type="button" className="text-btn mono" onClick={() => openRaw(d.docKey)}>
-            raw
+            edit raw
           </button>
         ) : null
       }
     >
-      <textarea
-        className="input input--area"
-        rows={3}
-        value={value}
-        readOnly={!d.writable || locked}
-        placeholder={
-          state === 'duplicate'
-            ? `## ${name} 出現多次，請用 raw 編輯修正`
+      {html ? (
+        <div className="md-preview prose" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <p className="md-preview md-preview--empty">
+          {state === 'duplicate'
+            ? `## ${name} 出現多次，請用 edit raw 修正`
             : state === 'missing'
-              ? `找不到 ## ${name}，請用 raw 編輯新增`
-              : placeholder
-        }
-        onChange={(e) => editField(d.docKey, SECTION_PREFIX + name, e.target.value)}
-      />
+              ? `找不到 ## ${name}，請用 edit raw 新增`
+              : placeholder}
+        </p>
+      )}
     </Section>
   )
 }
@@ -496,7 +508,7 @@ function NodeInspector({ node, onClose }: { node: CardNode; onClose: () => void 
         <div className="ins-foot__meta">
           <button type="button" className="text-btn mono" onClick={() => openRaw(d.docKey)}>
             <FileCode2 size={13} />
-            raw
+            edit raw
           </button>
           <span className="ins-path mono" title={d.path}>
             {d.path}

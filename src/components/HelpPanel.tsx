@@ -268,7 +268,7 @@ const SECTIONS: Section[] = [
             <b>新增</b>：Toolbar 的 Add Node，或 <kbd>A</kbd> ADR、<kbd>M</kbd> Milestone、<kbd>T</kbd> Task。會在 <C>docs/</C> 建檔並配發編號。
           </li>
           <li>
-            <b>編輯</b>：選取卡片後在右側 Inspector 修改。文字欄位 400ms 後自動存檔，下拉選單立即存檔。
+            <b>編輯</b>：選取卡片後在右側 Inspector 修改。文字欄位 400ms 後自動存檔，下拉選單立即存檔。Context、Decision 等段落以 Markdown 預覽顯示，要修改時按段落旁的 <C>edit raw</C>。
           </li>
           <li>
             <b>連線</b>：從卡片邊緣的把手拖到另一張卡片。關聯寫在來源端的 frontmatter（<C>implements</C>、<C>milestone</C>、<C>depends</C>、
