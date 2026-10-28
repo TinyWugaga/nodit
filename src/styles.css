@@ -3486,7 +3486,8 @@ button.tree__toggle {
   font-size: 12px;
 }
 .review-state[data-state='stale'],
-.review-state[data-state='missing'] {
+.review-state[data-state='missing'],
+.review-state[data-state='invalid'] {
   color: var(--accent-text);
 }
 

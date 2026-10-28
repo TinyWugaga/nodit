@@ -3,6 +3,7 @@ import { kindOfId, REVIEW_STATUSES, REVIEW_VERDICTS, type ReviewRecord } from '.
 import { splitDoc } from './frontmatter'
 import { docKeyOf, revisionOf, type ParsedDoc } from './parse'
 import type { ClientReview, Diagnostic } from './protocol'
+import { cardResolver } from './targets'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const BLOB = /^[0-9a-f]{40}$/
@@ -110,18 +111,19 @@ const byDiag = (a: Diagnostic, b: Diagnostic) => a.code.localeCompare(b.code) ||
  * compare the JSON of two results to detect derived-only changes (a target edited or deleted).
  */
 export function linkReviews(reviews: ClientReview[], docs: ParsedDoc[]): { reviews: ClientReview[]; diagnostics: Diagnostic[] } {
-  const byId = new Map<string, ParsedDoc>()
-  for (const d of docs) if (d.card && !byId.has(d.card.id)) byId.set(d.card.id, d)
+  const resolve = cardResolver(docs)
   const out = [...reviews]
     .sort((a, b) => a.path.localeCompare(b.path))
     .map((r) => {
       const diagnostics = r.diagnostics.filter((x) => !LINK_CODES.includes(x.code))
       const targets = (r.review?.targets ?? []).map((id) => {
-        const d = byId.get(id)
-        if (!d) {
+        const res = resolve(id)
+        if (res.state === 'invalid') return { id, state: 'invalid' as const }
+        if (res.state === 'missing') {
           diagnostics.push({ level: 'warning', code: 'review-target-dangling', message: `target 指向不存在的 ${id}`, path: r.path })
           return { id, state: 'missing' as const }
         }
+        const d = res.doc
         const rev = r.review!.targetRev[id]
         const state = !rev ? ('unrecorded' as const) : rev === d.blob ? ('current' as const) : ('stale' as const)
         return { id, state, docKey: d.docKey }

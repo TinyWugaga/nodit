@@ -133,6 +133,25 @@ describe('linkReviews', () => {
     expect(diagnostics.every((d) => d.docKey === undefined && d.path === REL)).toBe(true)
   })
 
+  it('marks a duplicated ID invalid instead of picking the first file, and recovers once repaired', () => {
+    const a = card('docs/decisions/ADR-001-a.md', adr('ADR-001'))
+    const b = card('docs/decisions/ADR-001-b.md', adr('ADR-001', 'other\n'))
+    const r = parse(reviewText(`${VALID}\ntarget_rev:\n  ADR-001: ${a.blob}`))
+    const dup = linkReviews([r], [a, b])
+    expect(dup.reviews[0].targets[0]).toEqual({ id: 'ADR-001', state: 'invalid' })
+    expect(dup.diagnostics.filter((d) => d.message.includes('ADR-001'))).toEqual([])
+    expect(linkReviews([r], [a]).reviews[0].targets[0].state).toBe('current')
+    expect(linkReviews([r], [b]).reviews[0].targets[0].state).toBe('stale')
+  })
+
+  it('marks a target shown from its retained card invalid, not current', () => {
+    const a = card('docs/decisions/ADR-001-a.md', adr('ADR-001'))
+    const r = parse(reviewText(`${VALID}\ntarget_rev:\n  ADR-001: ${a.blob}`))
+    const retained = { ...a, stale: true }
+    expect(linkReviews([r], [retained]).reviews[0].targets[0]).toEqual({ id: 'ADR-001', state: 'invalid' })
+    expect(linkReviews([r], [a]).reviews[0].targets[0].state).toBe('current')
+  })
+
   it('is idempotent and order-stable when re-linked', () => {
     const a1 = card('docs/decisions/ADR-001-a.md', adr('ADR-001'))
     const rs = [parse(reviewText(VALID), 'docs/reviews/b.md'), parse(reviewText(VALID), 'docs/reviews/a.md')]
