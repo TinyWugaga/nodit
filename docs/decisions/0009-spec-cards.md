@@ -1,6 +1,6 @@
 # 0009 — Spec 卡片：ADR 與實作之間的技術規格
 
-- 狀態：Proposed
+- 狀態：Accepted（2026-10-29）
 - 日期：2026-10-26（同日修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review.md` 的 7 項 findings；2026-10-29 修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review-2.md` 的 2 項 findings；同日再修訂：處理 `docs/reviews/2026-10-29-0009-spec-cards-review-3.md` 的 3 項 findings；同日再修訂：補 `spec-adr-not-accepted` 依 ADR status 區分訊息、`supersede-status` 的收集迴圈、Task 提示的連線種類）
 - 延伸：0003 的資料來源與寫入協定、0007 的過期判定
 
