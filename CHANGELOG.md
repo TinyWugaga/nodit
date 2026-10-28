@@ -11,6 +11,10 @@
   - 處理 review 時，AI 會讀完整份正文；Findings 以外的修改要求會另外列出來請你決定，不會靜默略過。
   - 已 init 的專案重跑 `nodit init` 即可取得。
 
+### Fixed
+
+- review 的目標卡片 ID 重複，或目標檔目前格式錯誤、畫面只剩上一次有效的內容時，review viewer 改為顯示「卡片無法判定」。原本會拿掃描到的第一個檔案或保留的舊內容比對，可能顯示錯誤的「評估的是目前版本」或「評估後已修改」。
+
 ### Security
 
 - Nodit 頁面加上 Content-Security-Policy。卡片、review、Architecture 正文裡指向其他網站的圖片與影音不再載入，避免 markdown 被寫入 `![](https://…?d=…)` 時，打開頁面就把內容送到外部。站內與 `data:` 圖片不受影響。

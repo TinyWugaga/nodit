@@ -80,4 +80,5 @@ export const TARGET_STATE_LABEL: Record<ReviewTargetState, string> = {
   stale: '評估後已修改',
   unrecorded: '未記錄版本',
   missing: '卡片不存在',
+  invalid: '卡片無法判定',
 }

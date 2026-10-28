@@ -89,8 +89,11 @@ export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number]
 export const REVIEW_STATUSES = ['open', 'addressed', 'dismissed'] as const
 export type ReviewStatus = (typeof REVIEW_STATUSES)[number]
 
-/** current: reviewed content is what is on disk; unrecorded: the review did not say which content it read */
-export type ReviewTargetState = 'current' | 'stale' | 'unrecorded' | 'missing'
+/**
+ * current: reviewed content is what is on disk; unrecorded: the review did not say which content it read;
+ * invalid: the ID has no single valid file to compare against (duplicate ID, or the file fails to parse)
+ */
+export type ReviewTargetState = 'current' | 'stale' | 'unrecorded' | 'missing' | 'invalid'
 
 /** Fields of a review file. Values are only guaranteed valid when the review has no error diagnostics. */
 export type ReviewRecord = {

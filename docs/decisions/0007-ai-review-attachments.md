@@ -13,7 +13,7 @@
 - **附屬文件，不是 `CardKind`**：review 放在 `paths.review`（預設 `docs/reviews/`），不上畫布、不參與連線。卡片顯示 badge，Inspector 列出 reviews，viewer 閱讀全文並改狀態。
 - **關聯寫在 review 端**：`target: [ID…]`。AI 只新增檔案，不修改被評估的卡片。
 - **沒有 ID**：身分用路徑（`docKeyOf`）。檔名 `<日期>-<第一個目標>-<reviewer>-<6位hex>.md`；隨機後綴降低碰撞，不覆寫的保證來自 exclusive create（`set -C` 或 `open(path, 'x')`），不需要 `nodit new` 的編號鎖。
-- **過期判定用 SHA-1 git blob hash**：`target_rev` 記錄 AI 讀到的目標內容指紋，Nodit 對目前檔案算同一個值比對。target 狀態分為 current／stale／unrecorded／missing；沒填 `target_rev` 顯示「未記錄版本」，不視為仍有效。
+- **過期判定用 SHA-1 git blob hash**：`target_rev` 記錄 AI 讀到的目標內容指紋，Nodit 對目前檔案算同一個值比對。target 狀態分為 current／stale／unrecorded／missing／invalid（見下方 2026-10-29 補充）；沒填 `target_rev` 顯示「未記錄版本」，不視為仍有效。
   - 演算法固定為 SHA-1，不隨 repo 的 object format 改變。git 2.55 的 `hash-object` 沒有 `--object-format` 參數，在 SHA-256 repo 內會算出不同值，所以 AI 指令提供不依賴 git 的 shell 指令，只有確定是 SHA-1 repo 時才用 `git hash-object --no-filters`。
   - `target_rev` 必須在讀目標檔時計算。review 寫完後再對最新檔案重算，會把沒審過的修改標成 current。
 - **status 套用整份 review**：`open`／`addressed`／`dismissed`，不做逐 target 狀態。viewer 的狀態按鈕是「標記為已處理」「略過整份」「重新開啟整份 review」；review 有多個 target 時，footer 會寫出「同時套用到 …」，列出會一起受影響的卡片。addressed／dismissed 的 review 仍顯示 stale，不自動 reopen。
@@ -38,6 +38,16 @@
 - **寫 review**：要求修改、補充或做決定的事項，一律寫成 `## Findings` 底下的 `- [ ]` 項目。是否阻擋其他工作屬於優先序，標在項目開頭（例如 `**P1**（期限：ADR 接受前）`），不決定要不要列成 finding。需要分組時，在 Findings 底下用 `###`；Findings 計數會一路算到下一個 `##` 為止，所以分組不影響計數。其他段落只放背景、已解決項目的核對、不需要修改的建議。
 - **處理 review**：讀整份正文，不只 Summary 與 Findings。Findings 以外的疑似修改要求，在回覆裡列成「Findings 以外的修改要求」並附上原文，由人決定要不要納入。AI 不自行處理，也不替評估者把它們搬進 Findings，因為 review 正文的內容屬於評估者。
 - 在 viewer 提示「Findings 以外的 checklist」暫時不做：程式只抓得到 checklist，抓不到一般條列或段落裡的要求，主要防線仍是上面兩條規則。
+
+## 目標無法判定（2026-10-29 補充）
+
+原本的目標解析在同一 ID 有多個檔案時，只取掃描到的第一筆；目標檔解析失敗、畫布上只剩保留的舊 card 時，也照樣拿來比對指紋。兩種情況都可能顯示錯的 current／stale。0009 的 Spec 過期判定需要同一套解析，所以先修正這裡。
+
+- 新增 `invalid` 狀態，viewer 顯示「卡片無法判定」。判定順序是 invalid > missing > unrecorded／current／stale。
+- invalid 包括：同一 ID 有多個檔案（`id-duplicate`）；目標檔目前解析失敗，只靠 `retainCard` 保留上一次有效的 card（`card-stale`）。
+- 不從候選檔任取一份，也不拿保留的舊 card 比對。原因由既有診斷說明，review 端不另發診斷。
+- 「ID → 唯一有效目標或 invalid」的解析在 `core/targets.ts` 的 `cardResolver`，0009 的 Spec linking pass 與 `nodit rev` 共用它。
+- 修復重複或解析錯誤之後，狀態依目前的檔案重新判定。
 
 ## 影響
 
