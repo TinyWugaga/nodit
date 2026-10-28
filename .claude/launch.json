@@ -13,7 +13,8 @@
         "--dev-origin",
         "http://localhost:5174"
       ],
-      "port": 4319
+      "port": 4319,
+      "autoPort": false
     },
     {
       "name": "nodit",

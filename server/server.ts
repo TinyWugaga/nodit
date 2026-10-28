@@ -11,6 +11,7 @@ import { revisionOf, toClientDoc, type ParsedDoc } from '../core/parse'
 import type { FieldPatch } from '../core/protocol'
 import { resolveInScope, ScopeError } from '../core/scope'
 import { ConflictError, ValidationError, Writer, type DocPatch, type LinkChange, type NewCard } from '../core/writer'
+import { CSP } from './csp'
 import { EventHub } from './events'
 import { ProjectService } from './project'
 
@@ -487,7 +488,7 @@ export async function start(opts: ServerOptions): Promise<RunningServer> {
     }
     if (target.endsWith('index.html')) {
       const html = buf.toString('utf8').replace('</head>', `<meta name="nodit-token" content="${ctx.owner.token}" />\n</head>`)
-      res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store' })
+      res.writeHead(200, { 'Content-Type': MIME['.html'], 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP })
       return res.end(html)
     }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(target)] ?? 'application/octet-stream' })
