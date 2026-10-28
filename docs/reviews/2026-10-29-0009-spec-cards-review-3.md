@@ -1,0 +1,40 @@
+# 0009 Spec 卡片第三輪評估
+
+評估日期：2026-10-29。目標：`docs/decisions/0009-spec-cards.md`，SHA-256：`1232a8133a76a6d09538be4a06081b033d70d8cce3e9b43ef64d4435eabad529`。本文件是一般 ADR 審查，不虛構 Nodit 卡片 ID。
+
+## Summary
+
+前兩輪 9 項 findings 在文件層面都已落實，連線推斷表、invalid 狀態、修訂流程與完成提示的契約已一致。本輪改從「實作時會撞到什麼」核對原始碼，找到一項 P1：`adr_rev` 沿用整檔 blob，ADR 只改 frontmatter 也會讓 Spec 變 stale，而且這個格式寫進檔案後很難再換。處理該項後建議改為 Accepted。
+
+另有兩項 P2／P3，屬實作前補清單與拆分順序，不阻擋接受。
+
+## Findings
+
+- [x] **P1（ADR 接受前）`adr_rev` 不應對整檔計算。** 0009:63 照 0007 用 SHA-1 git blob，而 `core/parse.ts:30-32` 與 `core/templates.ts:22` 的 `BLOB_COMMAND` 都是對整個檔案（含 frontmatter）計算。對 review 這是對的，因為 review 評估的就是整份檔案；對 Spec 則會產生系統性誤報：
+  - ADR 從 `proposed` 改成 `accepted` 時，所有在 proposed 期間寫的 draft Spec 立即變 stale。這正好落在 0009 推薦的流程上。
+  - 畫布上 ADR↔ADR 拉線（`src/store.ts:403-405`，`shouldReverse(adr, adr)` 為 false）會把 `relates` 寫進起點 ADR 的 frontmatter；Inspector 連結、改 `date` 同理。
+  - 0009:99 要求「不得只為清除 stale 刷新 hash」，於是每次誤報 AI 都得重讀 ADR 確認無實質變更。誤報一多，成本與「直接刷新」的誘因都會上升，過期判定反而失效。
+
+  推薦：`adr_rev` 改對 frontmatter 之後的 body 計算，並新增 `nodit rev <ID>` 輸出指紋，`nodit-spec` skill 改用 CLI，不再要求 AI 手寫 shell 切 frontmatter。review 的 `target_rev` 維持 0007 原樣。代價是兩套指紋演算法並存，以及 Spec 流程依賴 nodit CLI 可執行；換來的是 stale 只在 ADR 內容真正改動時出現。必須在接受前定案，因為 `adr_rev` 會寫進每份 Spec，事後換演算法會讓既有紀錄全部變 stale。 已處理：「過期判定」改為 ADR body 指紋（frontmatter 之後的 bytes，同 gitBlobHash 演算法），新增 `nodit rev <ID>` 並由 skill 一律使用；review 的 target_rev 不變；驗收加入「只改 frontmatter 維持 current」與 CLI／linking pass 指紋一致；整檔 blob 列入替代方案。
+
+- [x] **P2（實作前）「TypeScript 抓不到的擴充點」清單仍不完整。** 0009:149-155 列了 6 處，但 UI 有多處以 if 鏈或寫死陣列處理 kind，加入 `spec` 後編譯會通過、行為卻是錯的：
+  - `src/store.ts:140-162` 的 card → node 轉換：最後一段無條件回傳 `kind: 'task'`，Spec 會被渲染成沒有 Description 的 Task。
+  - `src/presentation.ts:50-53` 的 `matchesQuery`：`else` 當成 Task，搜尋不到 Spec 的 Scope／Design。
+  - `src/components/Inspector.tsx:132`、`:149` 的欄位區塊，以及 `:263` 的 spawn 按鈕清單 `['adr', 'milestone', 'task']`。
+  - `src/components/Toolbar.tsx:12-13` 的 `KINDS`、`ADD_KEYS`；`src/components/Sidebar.tsx:10-14` 的 `SECTIONS`；`src/nodes/CardNodeView.tsx:96-124` 的 per-kind 區塊。
+  - `core/parse.ts:58` 的 `inferIdFromFilename` 與 `:95` 的 H1 標題剝除，都寫死 `(ADR|MS|T)`。結果是 `SPEC-001-login.md` 無法從檔名推出 ID，`# SPEC-001 — Login` 的 title 也會保留前綴。
+
+  推薦：`src/types.ts` 的 `CardData` union 加入 `SpecData`，上述 if 鏈改成 `switch` 加 `never` exhaustive check，kind 清單改由 `CARD_KINDS` 衍生；前綴正則改由 `ID_RULES` 產生。這樣大部分項目會變成編譯錯誤，清單只需保留真正無法型別化的正則。另外 0009:148 的「26 個檔案（core 10、server 3、src 13）」與現況不符，實際是 19 個（core 8、server 1、src 10）；而且上述漏網點大多根本沒引用 `CardKind`，以引用數估工作量會低估。 已處理：「影響」更正為 19 個檔案，新增「先讓擴充點變成編譯錯誤」：SpecData 加入 union、if 鏈改 exhaustive switch、kind 清單由 CARD_KINDS 衍生、前綴正則由 ID_RULES 產生，逐一列出位置。
+
+- [x] **P3（實作順序）review 加入 invalid 是 0007 的行為變更，建議拆出先做。** 0009:91 要求 `linkReviews` 改用共用解析並加入 invalid。這會改 `core/domain.ts:96` 的 `ReviewTargetState` 型別、review viewer 的文字，以及 0007 的規格。它修的是既有 bug（同 ID 取第一筆、未排除解析失敗），與 Spec 無依賴。推薦拆成獨立 Task 先落地並在 0007 補註，Spec 的 linking pass 再直接沿用；避免一個 PR 同時改 review 既有行為與新增 kind。 已處理：新增「前置工作：review 目標解析加入 invalid」，拆成獨立 Task 先落地並在 0007 補註，共用解析函式由 Spec linking pass 與 `nodit rev` 沿用。
+
+## 已核對且無問題
+
+- 連線推斷：以 `src/store.ts:403`、`Inspector.tsx:187`、`core/import.ts:159` 三個呼叫點核對，0009 的推斷表與「寫在」欄可由 `shouldReverse` 加入 spec→task／spec→milestone、`inferLinkKind` 加入 task／milestone→spec 與 spec 同 kind 例外達成，16 種組合都能落在 `LINK_SCHEMA` 內。
+- `CROSS_CODES`（`server/project.ts:319`）、`CARD_RE`／`CARD_START`（`src/architecture/render.ts:11-12`）、`supersede-status`（`core/scan.ts:107-113`）、`TEMPLATE_VERSION = 6`、`countTasks`（`src/reviews.ts:7`）、舊 config 以 `DEFAULT_PATHS` 補值（`core/config.ts:86`），0009 的描述都與原始碼相符。
+- `SPEC-` 前綴不會與 `T-` 等既有 `ID_RULES.pattern` 衝突，`kindOfId` 可直接涵蓋。
+
+## 核對紀錄與限制
+
+- 依據：0009 全文、前兩輪 review，以及上述原始碼位置。
+- 本輪為靜態審查，未執行測試，也未修改 0009 或實作。由同一對話自行核對，非獨立驗收，仍可能有共同推理盲點；P2 清單以 grep 搜尋 kind 字面值與前綴正則取得，不保證窮盡。
