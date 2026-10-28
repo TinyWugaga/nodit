@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "projectId": "d56adf11-ad8c-47d8-851b-c3285747ed40",
+  "paths": {
+    "adr": "docs/decisions",
+    "milestone": "docs/milestones",
+    "task": "docs/tasks",
+    "architecture": "docs/ARCHITECTURE.md",
+    "layout": ".nodit/layout.json",
+    "review": "docs/reviews"
+  },
+  "watch": {
+    "usePolling": false
+  },
+  "managed": {
+    "AGENTS.md#nodit": {
+      "template": 6,
+      "hash": "bc735320b969e9d8cb3bc03686467ee4a36dd1c5"
+    },
+    "CLAUDE.md#nodit": {
+      "template": 6,
+      "hash": "9d0b5166e83c13511f267a8c33bfadbe50aa328e"
+    },
+    ".claude/skills/nodit-adr/SKILL.md": {
+      "template": 6,
+      "hash": "acfc7dc0066ac603dc74dfb668a8a26bd1546757"
+    },
+    ".claude/skills/nodit-milestone/SKILL.md": {
+      "template": 6,
+      "hash": "cc025aa2a16b1395c9310380cd1f7ed06be1ca8e"
+    },
+    ".claude/skills/nodit-task/SKILL.md": {
+      "template": 6,
+      "hash": "56366fa90be3abea2c0b51797612b138830e94d8"
+    },
+    ".claude/skills/nodit-architecture/SKILL.md": {
+      "template": 6,
+      "hash": "9ee6d39f43431bdca4cc2d0f6cf3342fa5d95206"
+    },
+    ".claude/skills/nodit-review/SKILL.md": {
+      "template": 6,
+      "hash": "880268e384ed31c17033ebab880929e4efcdb1be"
+    },
+    ".claude/skills/nodit-review-resolve/SKILL.md": {
+      "template": 6,
+      "hash": "1676147c74bdd84f6f1bd1b59e989f8e4ac43307"
+    }
+  }
+}
