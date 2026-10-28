@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { readOwner, readToken } from './core/owner.ts'
+import { DEV_CSP } from './server/csp.ts'
 
 const project = path.resolve(process.env.NODIT_PROJECT ?? 'examples/demo')
 const serverPort = Number(process.env.NODIT_PORT ?? 4319)
@@ -38,6 +39,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    headers: { 'Content-Security-Policy': DEV_CSP },
     proxy: { '/api': { target: `http://127.0.0.1:${serverPort}`, changeOrigin: true } },
   },
 })

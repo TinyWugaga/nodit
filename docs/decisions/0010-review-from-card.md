@@ -79,6 +79,10 @@ claude -p <prompt> --restricted --strict-mcp-config --tools Read,Grep,Glob
   - mermaid 等現有功能需要的來源，在拆出的 Task 裡逐項列出並納入 CSP。
   - 驗收：放一份含外部圖片的 review，打開後 Network 面板沒有對外請求。
 - 這個漏洞手動 review 也有，所以拆成獨立 Task 先落地。本決策的按鈕在這個 Task 完成前不得上線。
+- 已落地（2026-10-29）：policy 定義在 `server/csp.ts`。
+  - **來源盤點**：字型由 fontsource 打包，屬同源；CSS 只用 `data:` SVG；mermaid 在 SVG 內插入 `<style>`，所以 `style-src` 含 `'unsafe-inline'`；沒有外部腳本或 Worker。
+  - **dev 模式**：Vite dev 需要 inline script 與 HMR websocket，只套 `img-src`、`media-src` 兩條。
+  - **驗收結果**：正式 build 打開含 `http://127.0.0.1:9/leak.png` 的 review，console 回報 `img-src` 違規、請求被擋；Architecture 頁兩張 mermaid 圖正常渲染、沒有其他違規。dev 模式同樣擋下外部圖片，HMR 正常。
 
 ### prompt 與 skill 共用同一份規則
 

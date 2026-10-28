@@ -109,6 +109,25 @@ describe('server', () => {
     expect(await readFile(path.join(root, T3), 'utf8')).toContain('status: todo')
   })
 
+  it('serves the app shell with a CSP that keeps rendered markdown on this origin', async () => {
+    const dist = await mkdtemp(path.join(tmpdir(), 'nodit-dist-'))
+    await writeFile(path.join(dist, 'index.html'), '<html><head></head><body></body></html>')
+    await srv.close()
+    srv = await start({ root, port: 0, distDir: dist })
+    base = origin()
+    try {
+      const csp = (await fetch(`${base}/`)).headers.get('content-security-policy')
+      const directive = (name: string) => csp?.split('; ').find((d) => d.startsWith(`${name} `))
+      expect(directive('img-src')).toBe("img-src 'self' data:")
+      expect(directive('media-src')).toBe("media-src 'self'")
+      expect(directive('script-src')).toBe("script-src 'self'")
+      expect(directive('connect-src')).toBe("connect-src 'self'")
+      expect((await fetch(`${base}/some/route`)).headers.get('content-security-policy')).toBe(csp)
+    } finally {
+      await rm(dist, { recursive: true, force: true })
+    }
+  })
+
   it('refuses a second server on the same project', async () => {
     await expect(start({ root, port: 0 })).rejects.toBeInstanceOf(LockBusyError)
   })
