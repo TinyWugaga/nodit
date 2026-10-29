@@ -12,7 +12,7 @@ relates: [ADR-007, ADR-003]
 - 狀態：Accepted
 - 日期：2026-10-29（修訂見文末）
 - 延伸：0007 的 review 附屬文件、0003 的寫入協定
-- 實作規格：[SPEC-001 job 規格](../specs/0001-review-job.md)
+- 實作規格：[SPEC-003 job 規格](../specs/0003-review-job.md)
 
 > **結論**
 >
@@ -53,7 +53,7 @@ relates: [ADR-007, ADR-003]
 | 讀卡片與相關程式碼、寫評估內容 | agent，唯讀 |
 | 驗證輸出、組 frontmatter、exclusive create 寫檔 | server，經 Writer queue |
 
-這個分工提供以下保證，具體旗標與驗證規則見 SPEC-001：
+這個分工提供以下保證，具體旗標與驗證規則見 SPEC-003：
 
 - agent 只有讀檔工具，不能寫檔、執行指令或連網，讀取範圍限制在專案內，`.env` 類檔案不可讀。
 - repo 自帶的 settings、hooks、MCP server 都不載入。
@@ -95,7 +95,7 @@ relates: [ADR-007, ADR-003]
 
 詳細紀錄見文末附錄。
 
-- **權限邊界成立**（附錄 A）：在暫存專案放入 `.env`、指向外部的 symlink、會執行指令的 hook 與 MCP server，SPEC-001 的旗標組合全部擋下；第一版的路徑規則擋不住 hooks、MCP 與 `grep -r`。只在 macOS、claude 2.1.302 驗證過。
+- **權限邊界成立**（附錄 A）：在暫存專案放入 `.env`、指向外部的 symlink、會執行指令的 hook 與 MCP server，SPEC-003 的旗標組合全部擋下；第一版的路徑規則擋不住 hooks、MCP 與 `grep -r`。只在 macOS、claude 2.1.302 驗證過。
 - **唯讀不會讓評估變淺**（附錄 B）：兩張卡片各跑按鈕版與手動版，finding 數相同、各有對方沒找到的項目，按鈕版成本約為 1/4–1/2。樣本小，沒測到需要 git 歷史或跑測試的卡片。
 - **仍存在的風險**：不符合 `.env*` pattern 的機密檔仍可讀，內容可能進入 review 正文並被 commit。CSP 與連結確認因此是必要條件；「尚未審閱」標示提醒使用者 commit 前先讀。
 
@@ -122,7 +122,7 @@ relates: [ADR-007, ADR-003]
 
 - 2026-10-29：處理 `docs/reviews/2026-10-29-0010-review-from-card-review.md` 的 P0、P1。
 - 2026-10-29：處理 `docs/reviews/2026-10-29-0010-review-from-card-review-2.md` 的 P1。
-- 2026-10-29：結構重整，決策內容不變。開頭加結論；旗標、輸出驗證、寫檔、CSP 落地細節與 job 生命週期移到 SPEC-001；被否決的方案集中到「替代方案」；spike 與品質對照移到附錄。兩份 review 引用的行號以重整前的版本為準。
+- 2026-10-29：結構重整，決策內容不變。開頭加結論；旗標、輸出驗證、寫檔、CSP 落地細節與 job 生命週期移到 SPEC-003；被否決的方案集中到「替代方案」；spike 與品質對照移到附錄。兩份 review 引用的行號以重整前的版本為準。
 
 ### 附錄 A：驗證結果（2026-10-29 spike）
 
@@ -149,7 +149,7 @@ relates: [ADR-007, ADR-003]
 | --- | --- | --- | --- | --- |
 | A：`dontAsk` + `Read(./**)` 等路徑規則（本文件第一版） | **執行**，兩個 pwned 檔都產生 | 拒絕 | 加 deny 規則後拒絕；但 `grep -r` 會印出內容 | **可執行**，`grep -r ENV-SECRET .` 印出 `.env` 內容 |
 | B：A + `--setting-sources user --strict-mcp-config --disallowedTools Bash` | 未執行 | 拒絕 | 拒絕 | 工具不存在 |
-| C：SPEC-001 的「agent 旗標」 | 未執行 | 拒絕，錯誤訊息標明 `--restricted` | 拒絕 | 工具不存在；可用工具只有 Read、Grep、Glob |
+| C：SPEC-003 的「agent 旗標」 | 未執行 | 拒絕，錯誤訊息標明 `--restricted` | 拒絕 | 工具不存在；可用工具只有 Read、Grep、Glob |
 
 路徑形式：Read 工具只接受絕對路徑，spike 中所有讀取都是以絕對路徑送出；C 組的 `../outside/secret.txt` 也被 `--restricted` 拒絕。
 
@@ -185,7 +185,7 @@ A 組另外測過：project skill 在 `dontAsk` 下被拒絕；Agent tool 可以
 - 目標：`examples/nodit` 的 ADR-007（已實作，可對照程式碼）與 ADR-009（Proposed，涉及待改的程式碼）。每張卡片跑按鈕版旗標與手動版各一次，共 4 次，同時執行。
 - 環境：從 HEAD 匯出，`git init` 成單一 commit 的乾淨資料夾，把 `examples/nodit` 的卡片、config、skills 放到根目錄，讓卡片和程式碼在同一個專案裡。刪掉所有既有 review 與 git 歷史，避免 agent 照抄 ADR-009 的三輪 review。
 - 手動版：`claude -p "/nodit-review <ID>" --permission-mode acceptEdits --allowedTools Bash`，可以寫檔與執行指令，並提供 `node_modules`，模擬使用者核准所有操作的互動流程。
-- 按鈕版：SPEC-001「agent 旗標」的組合，prompt 只保留寫作規則與輸出格式。
+- 按鈕版：SPEC-003「agent 旗標」的組合，prompt 只保留寫作規則與輸出格式。
 - 兩者都用 CLI 預設 model（實際是 `claude-opus-5-5`），每次 `--max-budget-usd 5`。
 
 **結果**

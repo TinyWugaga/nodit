@@ -1,8 +1,9 @@
-# SPEC-001 — 從卡片觸發 AI review：job 規格
+# SPEC-003 — 從卡片觸發 AI review：job 規格
 
 - 狀態：Approved
 - 日期：2026-10-29
 - 實作：[0010 從卡片觸發 AI review](../decisions/0010-review-from-card.md)
+- adr_rev：ADR-010 `216816d46db71fd7c20bec915bee2f08103cd7b8`（`nodit rev ADR-010 --dir examples/nodit`）
 
 0010 決定了「做什麼、為什麼、保證什麼」，這份 Spec 寫「具體怎麼做」。兩者衝突時以 0010 為準，並回頭修正這份 Spec。
 
