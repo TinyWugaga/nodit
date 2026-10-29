@@ -77,7 +77,7 @@ describe('server', () => {
     const p = await project()
     expect(p.sessionId).toBe(srv.project.sessionId)
     expect(p.rev).toBeGreaterThan(0)
-    expect(p.docs).toHaveLength(11)
+    expect(p.docs).toHaveLength(14)
     expect(p.docs.every((d) => d.writable)).toBe(true)
   })
 

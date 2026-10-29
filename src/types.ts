@@ -1,9 +1,9 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { AdrStatus, CardKind, LinkKind, MilestoneStatus, Priority, TaskStatus } from '../core/domain'
-import type { Diagnostic } from '../core/protocol'
+import type { AdrStatus, CardKind, LinkKind, MilestoneStatus, Priority, SpecStatus, TaskStatus } from '../core/domain'
+import type { Diagnostic, SpecAdr } from '../core/protocol'
 import type { DraftView } from './data/drafts'
 
-export type { AdrStatus, CardKind, LinkKind, MilestoneStatus, Priority, TaskStatus }
+export type { AdrStatus, CardKind, LinkKind, MilestoneStatus, Priority, SpecStatus, TaskStatus }
 
 type CardBase = {
   code: string
@@ -44,7 +44,18 @@ export type TaskData = CardBase & {
   description: string
 }
 
-export type CardData = AdrData | MilestoneData | TaskData
+export type SpecData = CardBase & {
+  kind: 'spec'
+  status: SpecStatus
+  date: string
+  scope: string
+  design: string
+  criteria: string
+  /** each implemented ADR against `adr_rev`; empty when the spec implements no ADR */
+  adrStates: SpecAdr[]
+}
+
+export type CardData = AdrData | MilestoneData | TaskData | SpecData
 
 export type CardNode = Node<CardData, 'card'>
 

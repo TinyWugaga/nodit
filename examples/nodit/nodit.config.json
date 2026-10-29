@@ -14,36 +14,40 @@
   },
   "managed": {
     "AGENTS.md#nodit": {
-      "template": 6,
-      "hash": "bc735320b969e9d8cb3bc03686467ee4a36dd1c5"
+      "template": 7,
+      "hash": "ff066a49dbceaf0c2b061220026966244b722bcd"
     },
     "CLAUDE.md#nodit": {
-      "template": 6,
-      "hash": "9d0b5166e83c13511f267a8c33bfadbe50aa328e"
+      "template": 7,
+      "hash": "c5f5ccde443911490b40a1409a91876bf732705c"
     },
     ".claude/skills/nodit-adr/SKILL.md": {
-      "template": 6,
-      "hash": "acfc7dc0066ac603dc74dfb668a8a26bd1546757"
+      "template": 7,
+      "hash": "e9de83de7b4d439fd4b13b751f145ed89d0d60e7"
     },
     ".claude/skills/nodit-milestone/SKILL.md": {
-      "template": 6,
-      "hash": "cc025aa2a16b1395c9310380cd1f7ed06be1ca8e"
+      "template": 7,
+      "hash": "1a3d7d132749796301c8f2b206fc1a36d80ba8b9"
     },
     ".claude/skills/nodit-task/SKILL.md": {
-      "template": 6,
-      "hash": "56366fa90be3abea2c0b51797612b138830e94d8"
+      "template": 7,
+      "hash": "a6ef2ae2b00a0466ae590197aa6d93f8cfb8768e"
     },
     ".claude/skills/nodit-architecture/SKILL.md": {
-      "template": 6,
-      "hash": "9ee6d39f43431bdca4cc2d0f6cf3342fa5d95206"
+      "template": 7,
+      "hash": "bb808233cc024382e9a369cc69f72e495b658379"
     },
     ".claude/skills/nodit-review/SKILL.md": {
-      "template": 6,
-      "hash": "880268e384ed31c17033ebab880929e4efcdb1be"
+      "template": 7,
+      "hash": "4a5ae16c015efe47576ebd9b873990c049645d82"
     },
     ".claude/skills/nodit-review-resolve/SKILL.md": {
-      "template": 6,
-      "hash": "1676147c74bdd84f6f1bd1b59e989f8e4ac43307"
+      "template": 7,
+      "hash": "7f4f703b7ea7911b6aedbce3c6c49f9ca230d78c"
+    },
+    ".claude/skills/nodit-spec/SKILL.md": {
+      "template": 7,
+      "hash": "cef101f36aa5740567fa2be06c4b0900591f69ff"
     }
   }
 }

@@ -1,17 +1,14 @@
 import { AlertTriangle, Moon, PanelLeftClose, PanelLeftOpen, Rocket, Sun } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useFocusNode } from '../hooks'
-import { matchesQuery } from '../presentation'
+import { CARD_KINDS } from '../../core/domain'
+import { KIND_SECTION, matchesQuery } from '../presentation'
 import { useProject } from '../store'
 import type { CardKind, CardNode } from '../types'
 import { Rule } from './Frame'
 import { KindIcon } from './KindIcon'
 
-const SECTIONS: { kind: CardKind; label: string }[] = [
-  { kind: 'adr', label: 'ADR Registry' },
-  { kind: 'milestone', label: 'Milestones' },
-  { kind: 'task', label: 'Tasks' },
-]
+const SECTIONS = CARD_KINDS.map((kind) => ({ kind, label: KIND_SECTION[kind] }))
 
 export function Logo() {
   return (

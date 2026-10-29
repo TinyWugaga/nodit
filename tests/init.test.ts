@@ -51,6 +51,7 @@ describe('init', () => {
       expect(await exists(f)).toBe(true)
     }
     expect(await exists('docs/decisions')).toBe(true)
+    expect(await exists('docs/specs')).toBe(true)
     const config = JSON.parse(await read('nodit.config.json'))
     expect(Object.keys(config.managed).sort()).toEqual([
       '.claude/skills/nodit-adr/SKILL.md',
@@ -58,6 +59,7 @@ describe('init', () => {
       '.claude/skills/nodit-milestone/SKILL.md',
       '.claude/skills/nodit-review-resolve/SKILL.md',
       '.claude/skills/nodit-review/SKILL.md',
+      '.claude/skills/nodit-spec/SKILL.md',
       '.claude/skills/nodit-task/SKILL.md',
       'AGENTS.md#nodit',
       'CLAUDE.md#nodit',
@@ -123,7 +125,7 @@ describe('init', () => {
     const p = await plan()
     expect(action(p, 'AGENTS.md#nodit')).toBe('skip')
     await applyInit(writer, p, applicable(p))
-    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(8)
+    expect(Object.keys(JSON.parse(await read('nodit.config.json')).managed)).toHaveLength(9)
   })
 
   it('does not overwrite a file that appeared between preview and apply', async () => {
@@ -195,7 +197,18 @@ describe('init', () => {
     expect(skill).toMatch(/^---\nname: nodit-review-resolve\ndescription: .+\n# nodit-managed v\d+\n---\n/)
     expect(skill).toContain('`docs/reviews/`')
     expect(skill).toContain('- [x] 補上效能門檻。')
-    expect(TEMPLATE_VERSION).toBe(6)
+    expect(TEMPLATE_VERSION).toBe(7)
+  })
+
+  it('teaches AI to record adr_rev with nodit rev and open tasks from a spec', async () => {
+    await run()
+    const skill = await read('.claude/skills/nodit-spec/SKILL.md')
+    expect(skill).toMatch(/^---\nname: nodit-spec\ndescription: .+\n# nodit-managed v\d+\n---\n/)
+    expect(skill).toContain('nodit rev <ADR-ID>')
+    expect(skill).toContain('不得只為了清除提示就刷新指紋')
+    expect(await read('CLAUDE.md')).toContain('`/nodit-spec`')
+    expect(await read('AGENTS.md')).toContain('`docs/specs/SPEC-###-<slug>.md`')
+    expect(await read('.claude/skills/nodit-task/SKILL.md')).toContain('--implements SPEC-00X')
   })
 
   it('keeps every change request inside Findings and surfaces the ones that are not', async () => {

@@ -1,11 +1,15 @@
-import type { AdrStatus, CardData, CardKind, LinkKind, MilestoneStatus, Priority, TaskStatus } from './types'
-import type { ReviewTargetState } from '../core/domain'
+import type { AdrStatus, CardData, CardKind, LinkKind, MilestoneStatus, Priority, SpecStatus, TaskStatus } from './types'
+import type { ReviewTargetState, SpecAdrState } from '../core/domain'
 
 export const KIND_META: Record<CardKind, { label: string; prefix: string; pad: number }> = {
   adr: { label: 'ADR', prefix: 'ADR-', pad: 3 },
   milestone: { label: 'Milestone', prefix: 'MS-', pad: 2 },
   task: { label: 'Task', prefix: 'T-', pad: 3 },
+  spec: { label: 'Spec', prefix: 'SPEC-', pad: 3 },
 }
+
+/** sidebar group heading per kind */
+export const KIND_SECTION: Record<CardKind, string> = { adr: 'ADR Registry', spec: 'Specs', milestone: 'Milestones', task: 'Tasks' }
 
 export const STATUS_LABEL = {
   adr: {
@@ -25,6 +29,12 @@ export const STATUS_LABEL = {
     blocked: 'Blocked',
     done: 'Done',
   } satisfies Record<TaskStatus, string>,
+  spec: {
+    draft: 'Draft',
+    approved: 'Approved',
+    implemented: 'Implemented',
+    outdated: 'Outdated',
+  } satisfies Record<SpecStatus, string>,
 }
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
@@ -48,18 +58,39 @@ export function matchesQuery(d: CardData, query: string) {
   const q = query.trim().toLowerCase()
   if (!q) return true
   const fields = [d.code, d.title]
-  if (d.kind === 'adr') fields.push(d.context, d.decision, d.consequences)
-  else if (d.kind === 'milestone') fields.push(d.goal)
-  else fields.push(d.description, d.assignee)
+  switch (d.kind) {
+    case 'adr':
+      fields.push(d.context, d.decision, d.consequences)
+      break
+    case 'milestone':
+      fields.push(d.goal)
+      break
+    case 'task':
+      fields.push(d.description, d.assignee)
+      break
+    case 'spec':
+      fields.push(d.scope, d.design, d.criteria)
+      break
+    default:
+      assertNever(d)
+  }
   return fields.some((f) => f.toLowerCase().includes(q))
+}
+
+export function assertNever(x: never): never {
+  throw new Error(`unexpected kind: ${JSON.stringify(x)}`)
 }
 
 export const STATUS_RANK: Record<string, number> = {
   deprecated: 0,
   superseded: 0,
+  outdated: 0,
   proposed: 1,
   planned: 1,
   todo: 1,
+  draft: 1,
+  approved: 2,
+  implemented: 3,
   blocked: 2,
   doing: 2,
   active: 2,
@@ -81,4 +112,15 @@ export const TARGET_STATE_LABEL: Record<ReviewTargetState, string> = {
   unrecorded: '未記錄版本',
   missing: '卡片不存在',
   invalid: '卡片無法判定',
+}
+
+/** a spec card shows the state that needs attention first; `current` shows nothing */
+export const SPEC_ADR_PRIORITY: SpecAdrState[] = ['invalid', 'missing', 'stale', 'unrecorded']
+
+export const SPEC_ADR_LABEL: Record<SpecAdrState, string> = {
+  invalid: 'ADR 無法判定',
+  missing: 'ADR 不存在',
+  stale: 'ADR 已修改',
+  unrecorded: '未記錄 ADR 版本',
+  current: 'ADR 版本相符',
 }

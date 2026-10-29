@@ -1,14 +1,14 @@
 ---
 name: nodit-review-resolve
 description: 被要求處理、回應、修正或消化這個專案的 review（docs/reviews/ 裡未處理的 findings）時使用。依 findings 修改目標卡片或開 Task，在 review 正文勾選已處理的項目，不改 review 的 frontmatter。
-# nodit-managed v6
+# nodit-managed v7
 ---
 
 # 處理 review 的 findings（Nodit 格式）
 
 範圍：指定了 review 檔就處理那一份。只說「處理 review」時，處理 `docs/reviews/` 裡 `status: open`、格式正確、還有未勾選 finding 的 review；指定卡片 ID 時只處理 `target` 含那張卡片的。`addressed`、`dismissed` 的 review 不處理；格式錯誤的 review 不處理，在回覆裡列出路徑。
 
-1. 讀整份 review：frontmatter 與完整正文，不只 Summary 與 Findings。再讀 `target` 列出的每張卡片（`docs/decisions/`、`docs/milestones/`、`docs/tasks/`）與相關程式碼。
+1. 讀整份 review：frontmatter 與完整正文，不只 Summary 與 Findings。再讀 `target` 列出的每張卡片（`docs/decisions/`、`docs/specs/`、`docs/milestones/`、`docs/tasks/`）與相關程式碼。
 2. 檢查 `## Findings` 以外的段落。發現疑似修改要求時（其他段落裡的 checklist，或要求修改、補充、決定的句子）：不要當成 finding 處理，也不要略過，更不要替評估者搬進 Findings。在回覆裡另外列成「Findings 以外的修改要求」，附上段落名稱與原文，請人決定要不要納入。
 3. 逐條處理 `## Findings` 裡還沒勾選的 `- [ ]` 項目，包括 `###` 小標底下的項目：
    - 同意的：修改目標卡片。只動相關的欄位或段落，不要重排整份檔案，不要改 `id`。

@@ -1,7 +1,7 @@
 ---
 name: nodit-architecture
 description: 在這個專案撰寫、補完或更新架構文件（docs/ARCHITECTURE.md）時使用，包括 nodit init 之後填寫骨架，以及新增元件、調整資料夾結構、接受 ADR 之後同步文件。依 Nodit Architecture 頁的格式寫 mermaid、nodit-tree 與卡片代號。
-# nodit-managed v6
+# nodit-managed v7
 ---
 
 # 撰寫或更新架構文件（Nodit 格式）
@@ -10,7 +10,7 @@ description: 在這個專案撰寫、補完或更新架構文件（docs/ARCHITEC
 
 1. 先讀程式碼的進入點、主要資料夾與設定檔，再讀 `docs/decisions/` 裡 `accepted` 的 ADR。元件職責以程式碼為準，不要只憑檔名推測。
 2. 依下面的段落補完或更新。init 產生的骨架佔位內容（例如 `UI --> API --> Storage`、`src/  …`）要換成實際內容，不要留著。
-3. 提到決策、里程碑、工作時寫卡片代號（`ADR-001`、`MS-01`、`T-001`），Nodit 會把它們連到卡片。只寫 `docs/decisions/`、`docs/milestones/`、`docs/tasks/` 裡已存在的代號；寫在 code span 或程式碼區塊裡的代號不會變成連結。
+3. 提到決策、規格、里程碑、工作時寫卡片代號（`ADR-001`、`SPEC-001`、`MS-01`、`T-001`），Nodit 會把它們連到卡片。只寫 `docs/decisions/`、`docs/specs/`、`docs/milestones/`、`docs/tasks/` 裡已存在的代號；寫在 code span 或程式碼區塊裡的代號不會變成連結。
 4. 修改既有文件時只動相關段落，保留使用者自訂的段落與內容，不要重排整份檔案。
 5. 文件描述現況。還沒定案的方向用 `/nodit-adr` 寫成 ADR，不要寫進架構文件當成事實。
 

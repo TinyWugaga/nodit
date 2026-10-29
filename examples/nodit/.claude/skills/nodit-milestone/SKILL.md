@@ -1,7 +1,7 @@
 ---
 name: nodit-milestone
 description: 在這個專案規劃或更新里程碑（Milestone）時使用。依 Nodit 格式寫入 Milestone 檔案並連結相關 ADR。
-# nodit-managed v6
+# nodit-managed v7
 ---
 
 # 新增或修改 Milestone（Nodit 格式）

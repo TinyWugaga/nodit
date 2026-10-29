@@ -21,6 +21,7 @@ export const DEFAULT_PATHS: NoditPaths = {
   adr: 'docs/decisions',
   milestone: 'docs/milestones',
   task: 'docs/tasks',
+  spec: 'docs/specs',
   architecture: 'docs/ARCHITECTURE.md',
   layout: '.nodit/layout.json',
   review: 'docs/reviews',

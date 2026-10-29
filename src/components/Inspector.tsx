@@ -1,16 +1,17 @@
-import { AlertTriangle, ArrowLeftRight, ArrowRight, Crosshair, FileCode2, Link2, Maximize2, Minimize2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, ArrowRight, Crosshair, FileCode2, Info, Link2, Maximize2, Minimize2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { inferLinkKind, LINK_SCHEMA, shouldReverse, type LinkKind } from '../../core/domain'
+import { CARD_KINDS, inferLinkKind, LINK_SCHEMA, shouldReverse, SUPERSEDED_STATUS, type LinkKind } from '../../core/domain'
 import { renderMarkdown } from '../architecture/render'
 import type { DraftView } from '../data/drafts'
 import { SECTION_PREFIX } from '../data/httpClient'
 import { CARD_W, useAddCard, useFocusNode } from '../hooks'
 import { useMilestoneProgress } from '../nodes/CardNodeView'
-import { KIND_META, LINK_META, PRIORITY_LABEL, STATUS_LABEL } from '../presentation'
+import { assertNever, KIND_META, LINK_META, PRIORITY_LABEL, SPEC_ADR_LABEL, STATUS_LABEL } from '../presentation'
+import { criteriaCount, specCompletionHint, taskSpecHints } from '../specs'
 import { useProject } from '../store'
-import type { CardData, CardKind, CardNode, LinkEdge } from '../types'
+import type { CardData, CardKind, CardNode, LinkEdge, SpecData, TaskData } from '../types'
 import { Rule } from './Frame'
 import { KindIcon } from './KindIcon'
 import { ReviewList } from './ReviewParts'
@@ -122,6 +123,55 @@ function MilestoneMetrics({ id }: { id: string }) {
   )
 }
 
+function SpecAdrList({ states }: { states: SpecData['adrStates'] }) {
+  const focusCard = useProject((s) => s.focusCard)
+  if (!states.length) return <p className="ins-empty">沒有 implements 任何 ADR，不做過期判定。</p>
+  return (
+    <div className="link-list">
+      {states.map((a) => (
+        <button key={a.id} type="button" className="link-row link-row--adr" disabled={!a.docKey} onClick={() => focusCard(a.id)}>
+          <KindIcon kind="adr" size={15} />
+          <span className="link-row__code mono">{a.id}</span>
+          <span className="link-row__title spec-adr" data-state={a.state}>
+            {SPEC_ADR_LABEL[a.state]}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Hint({ children }: { children: ReactNode }) {
+  return (
+    <div className="ins-alert ins-alert--hint">
+      <p>
+        <Info size={14} />
+        {children}
+      </p>
+    </div>
+  )
+}
+
+function SpecHints({ d }: { d: SpecData }) {
+  const docs = useProject((s) => s.docs)
+  const hint = specCompletionHint(docs, d.code, d.status, d.criteria)
+  return hint ? <Hint>{hint}</Hint> : null
+}
+
+function TaskSpecHints({ d }: { d: TaskData }) {
+  const docs = useProject((s) => s.docs)
+  const implementsIds = docs.find((x) => x.docKey === d.docKey)?.card?.links.implements ?? []
+  return (
+    <>
+      {taskSpecHints(docs, implementsIds).map((h) => (
+        <Hint key={h.adr}>
+          {h.adr} 有可參考的 Spec：{h.specs.join('、')}
+        </Hint>
+      ))}
+    </>
+  )
+}
+
 function CardFields({ node }: { node: CardNode }) {
   const editField = useProject((s) => s.editField)
   const d = node.data
@@ -129,57 +179,93 @@ function CardFields({ node }: { node: CardNode }) {
   const set = (field: string) => (value: string) => editField(d.docKey, field, value, true)
   const type = (field: string) => (value: string) => editField(d.docKey, field, value)
 
-  if (d.kind === 'adr')
-    return (
-      <>
-        <div className="field-row">
-          <Field label="Status">
-            <Select value={d.status} options={STATUS_LABEL.adr} onChange={set('status')} disabled={ro} />
-          </Field>
-          <Field label="Date">
-            <input className="input" type="date" value={d.date} disabled={ro} onChange={(e) => set('date')(e.target.value)} />
-          </Field>
-        </div>
-        <SectionText d={d} name="Context" label="Context & Statement" value={d.context} placeholder="為什麼需要做這個決定？有哪些限制？" />
-        <SectionText d={d} name="Decision" label="Decision" value={d.decision} placeholder="我們決定…" />
-        <SectionText d={d} name="Consequences" label="Consequences" value={d.consequences} placeholder="代價、風險、後續工作" />
-      </>
-    )
+  switch (d.kind) {
+    case 'adr':
+      return (
+        <>
+          <div className="field-row">
+            <Field label="Status">
+              <Select value={d.status} options={STATUS_LABEL.adr} onChange={set('status')} disabled={ro} />
+            </Field>
+            <Field label="Date">
+              <input className="input" type="date" value={d.date} disabled={ro} onChange={(e) => set('date')(e.target.value)} />
+            </Field>
+          </div>
+          <SectionText d={d} name="Context" label="Context & Statement" value={d.context} placeholder="為什麼需要做這個決定？有哪些限制？" />
+          <SectionText d={d} name="Decision" label="Decision" value={d.decision} placeholder="我們決定…" />
+          <SectionText d={d} name="Consequences" label="Consequences" value={d.consequences} placeholder="代價、風險、後續工作" />
+        </>
+      )
 
-  if (d.kind === 'milestone')
-    return (
-      <>
-        <div className="field-row">
-          <Field label="Status">
-            <Select value={d.status} options={STATUS_LABEL.milestone} onChange={set('status')} disabled={ro} />
-          </Field>
-          <Field label="Due">
-            <input className="input" type="date" value={d.dueDate} disabled={ro} onChange={(e) => set('due')(e.target.value)} />
-          </Field>
-        </div>
-        <Section label="Progress">
-          <MilestoneMetrics id={node.id} />
-        </Section>
-        <SectionText d={d} name="Goal" label="Goal · 完成條件" value={d.goal} placeholder="這個里程碑交付什麼？" />
-      </>
-    )
+    case 'milestone':
+      return (
+        <>
+          <div className="field-row">
+            <Field label="Status">
+              <Select value={d.status} options={STATUS_LABEL.milestone} onChange={set('status')} disabled={ro} />
+            </Field>
+            <Field label="Due">
+              <input className="input" type="date" value={d.dueDate} disabled={ro} onChange={(e) => set('due')(e.target.value)} />
+            </Field>
+          </div>
+          <Section label="Progress">
+            <MilestoneMetrics id={node.id} />
+          </Section>
+          <SectionText d={d} name="Goal" label="Goal · 完成條件" value={d.goal} placeholder="這個里程碑交付什麼？" />
+        </>
+      )
 
-  return (
-    <>
-      <div className="field-row">
-        <Field label="Status">
-          <Select value={d.status} options={STATUS_LABEL.task} onChange={set('status')} disabled={ro} />
-        </Field>
-        <Field label="Priority">
-          <Select value={d.priority} options={PRIORITY_LABEL} onChange={set('priority')} disabled={ro} />
-        </Field>
-      </div>
-      <Field label="Assignee">
-        <input className="input" value={d.assignee} placeholder="負責人" disabled={ro} onChange={(e) => type('assignee')(e.target.value)} />
-      </Field>
-      <SectionText d={d} name="Description" label="Description" value={d.description} placeholder="要做什麼、怎樣算完成" />
-    </>
-  )
+    case 'task':
+      return (
+        <>
+          <TaskSpecHints d={d} />
+          <div className="field-row">
+            <Field label="Status">
+              <Select value={d.status} options={STATUS_LABEL.task} onChange={set('status')} disabled={ro} />
+            </Field>
+            <Field label="Priority">
+              <Select value={d.priority} options={PRIORITY_LABEL} onChange={set('priority')} disabled={ro} />
+            </Field>
+          </div>
+          <Field label="Assignee">
+            <input className="input" value={d.assignee} placeholder="負責人" disabled={ro} onChange={(e) => type('assignee')(e.target.value)} />
+          </Field>
+          <SectionText d={d} name="Description" label="Description" value={d.description} placeholder="要做什麼、怎樣算完成" />
+        </>
+      )
+
+    case 'spec': {
+      const count = criteriaCount(d.criteria)
+      return (
+        <>
+          <SpecHints d={d} />
+          <div className="field-row">
+            <Field label="Status">
+              <Select value={d.status} options={STATUS_LABEL.spec} onChange={set('status')} disabled={ro} />
+            </Field>
+            <Field label="Date">
+              <input className="input" type="date" value={d.date} disabled={ro} onChange={(e) => set('date')(e.target.value)} />
+            </Field>
+          </div>
+          <Section label="ADR 版本">
+            <SpecAdrList states={d.adrStates} />
+          </Section>
+          <SectionText d={d} name="Scope" label="Scope" value={d.scope} placeholder="涵蓋與不涵蓋的範圍" />
+          <SectionText d={d} name="Design" label="Design" value={d.design} placeholder="介面、資料結構、流程與邊界條件" />
+          <SectionText
+            d={d}
+            name="Acceptance Criteria"
+            label={count ? `Acceptance Criteria · ${count.done}/${count.total}` : 'Acceptance Criteria'}
+            value={d.criteria}
+            placeholder="- [ ] 每一項都要能被驗證"
+          />
+        </>
+      )
+    }
+
+    default:
+      return assertNever(d)
+  }
 }
 
 /** Resolve where a link between `self` and `other` is stored and which relation it gets. */
@@ -260,7 +346,7 @@ function Connections({ node }: { node: CardNode }) {
       </div>
 
       <div className="spawn">
-        {(['adr', 'milestone', 'task'] as CardKind[]).map((k) => (
+        {CARD_KINDS.map((k) => (
           <button key={k} type="button" className={`spawn__btn spawn__btn--${k}`} onClick={() => spawn(k)}>
             <Plus size={12} />
             {KIND_META[k].label}
@@ -426,6 +512,7 @@ function NodeInspector({ node, onClose }: { node: CardNode; onClose: () => void 
   const [isNew] = useState(() => /^未命名 /.test(d.title))
   const errors = d.diagnostics.filter((x) => x.level === 'error')
   const superseded = d.diagnostics.find((x) => x.code === 'supersede-status')
+  const supersededStatus = SUPERSEDED_STATUS[d.kind]
 
   return (
     <>
@@ -474,15 +561,15 @@ function NodeInspector({ node, onClose }: { node: CardNode; onClose: () => void 
             </div>
           </div>
         )}
-        {superseded && d.writable && (
+        {superseded && supersededStatus && d.writable && (
           <div className="ins-alert">
             <p>
               <AlertTriangle size={14} />
               {superseded.message}
             </p>
             <div className="ins-alert__actions">
-              <button type="button" className="btn btn--primary" onClick={() => editField(d.docKey, 'status', 'superseded', true)}>
-                標記為 superseded
+              <button type="button" className="btn btn--primary" onClick={() => editField(d.docKey, 'status', supersededStatus, true)}>
+                標記為 {supersededStatus}
               </button>
             </div>
           </div>

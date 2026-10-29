@@ -1,12 +1,12 @@
 ---
 name: nodit-review
-description: 被要求評估、審查或 review 這個專案的 ADR、Milestone 或 Task 時使用。把評估結果寫成 docs/reviews/ 裡的新檔案，Nodit 會把它掛到目標卡片上。
-# nodit-managed v6
+description: 被要求評估、審查或 review 這個專案的 ADR、Spec、Milestone 或 Task 時使用。把評估結果寫成 docs/reviews/ 裡的新檔案，Nodit 會把它掛到目標卡片上。
+# nodit-managed v7
 ---
 
 # 評估卡片（Nodit review 格式）
 
-1. 讀目標卡片（`docs/decisions/`、`docs/milestones/`、`docs/tasks/`）與相關程式碼。讀每個目標檔的同時，用下方「格式」裡的指令算出它的指紋並記下來。
+1. 讀目標卡片（`docs/decisions/`、`docs/specs/`、`docs/milestones/`、`docs/tasks/`）與相關程式碼。讀每個目標檔的同時，用下方「格式」裡的指令算出它的指紋並記下來。
 2. 評估完成後，依格式建立一份新檔案。評估時不要修改目標卡片本身，也不要修改既有的 review；要處理既有 review 的 findings 時改用 `/nodit-review-resolve`。
 3. 每個要求修改、補充或做決定的事項，都寫成 `## Findings` 底下的一個 `- [ ]` 項目，具體說明問題與建議；優先序與期限寫在項目開頭。其他段落不放修改要求。
 4. `verdict`：可以直接接受寫 `approve`；需要修改寫 `changes`；方向有根本問題寫 `reject`。

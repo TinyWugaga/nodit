@@ -8,6 +8,8 @@ import { CONFIG_INVALID, loadConfig, type NoditConfig } from '../core/config'
 import { ImportError, runImport, type ImportConflict, type ImportReport } from '../core/import'
 import { applyInit, initPaths, planInit, publicPlan, scopedRead, type InitResult } from '../core/init'
 import { CARD_KINDS, LINK_KINDS, type CardKind, type LinkKind } from '../core/domain'
+import { scanDocs } from '../core/scan'
+import { revOf } from '../core/spec'
 import { acquireOwner, LockBusyError, readToken, type OwnerInfo } from '../core/owner'
 import type { ClientDoc } from '../core/protocol'
 import { ValidationError, Writer, type LinkChange, type NewCard } from '../core/writer'
@@ -15,15 +17,16 @@ import { start } from './server'
 
 const HELP = `nodit [dir] [--port 4319] [--browse-root <path>]   開啟專案（預設為目前目錄）；UI 內只能切換到 browse root 底下的專案（預設為家目錄）
 nodit init [dir] [--no-ai] [--yes] [--dry-run]   初始化：設定檔、資料夾與 AI 指令檔
-nodit new <adr|milestone|task> "<title>" [options]
+nodit new <adr|milestone|task|spec> "<title>" [options]
     --dir <path>             專案目錄（預設 .）
     --status <status>        初始狀態
     --implements <ID>        可重複
     --milestone <MS-ID>      task 所屬的 milestone
     --depends <ID>           可重複
-    --supersedes <ADR-ID>    可重複（新 ADR 取代舊 ADR）
+    --supersedes <ID>        可重複（新 ADR／Spec 取代舊的同類卡片）
     --relates <ID>           可重複
     --json                   以 JSON 輸出結果
+nodit rev <ID> [--dir <path>]       輸出卡片 body（frontmatter 之後）的指紋，用於 Spec 的 adr_rev
 nodit import <file.json> [dir]       匯入舊版 localStorage 匯出（nodit:project）；中斷後用同一個檔案重跑即可續跑
 nodit --version | -v                 顯示版本
 nodit --help | -h                    顯示這份說明`
@@ -74,7 +77,7 @@ async function packageVersion() {
 async function serve(argv: string[]) {
   const args = parseServeArgs(argv)
   const dir = await stat(path.resolve(args.dir)).catch(() => null)
-  if (!dir?.isDirectory()) throw new CliError(`找不到目錄：${args.dir}（子指令只有 init、new、import）\n\n${HELP}`)
+  if (!dir?.isDirectory()) throw new CliError(`找不到目錄：${args.dir}（子指令只有 init、new、rev、import）\n\n${HELP}`)
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist')
   const running = await start({
     root: args.dir,
@@ -268,6 +271,27 @@ async function cmdNew(argv: string[]) {
   }
 }
 
+async function cmdRev(argv: string[]) {
+  let id: string | undefined
+  let dir = '.'
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]
+    if (a === '--dir') {
+      dir = argv[++i]
+      if (dir === undefined) throw new CliError(`--dir 需要一個值\n\n${HELP}`)
+    } else if (a.startsWith('-') || id) throw new CliError(`不認得的參數：${a}\n\n${HELP}`)
+    else id = a
+  }
+  if (!id) throw new CliError(`用法：nodit rev <ID> [--dir <path>]\n\n${HELP}`)
+  const root = path.resolve(dir)
+  const { config, diagnostics } = await loadConfig(root)
+  const invalid = diagnostics.find((d) => d.code === CONFIG_INVALID)
+  if (invalid) throw new CliError(invalid.message)
+  const result = revOf(await scanDocs(root, config), id)
+  if (!result.ok) throw new CliError(result.message)
+  console.log(result.rev)
+}
+
 function importFailure(message: string, conflicts: ImportConflict[] = []) {
   return new CliError([message, ...conflicts.map((c) => `  ✗ ${c.id ? c.id + '  ' : ''}${c.path}  — ${c.reason}`)].join('\n'))
 }
@@ -308,6 +332,7 @@ async function main() {
   if (cmd === '--version' || cmd === '-v') return console.log(await packageVersion())
   if (cmd === 'new') return cmdNew(rest)
   if (cmd === 'init') return cmdInit(rest)
+  if (cmd === 'rev') return cmdRev(rest)
   if (cmd === 'import') return cmdImport(rest)
   return serve(process.argv.slice(2))
 }

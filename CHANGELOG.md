@@ -4,7 +4,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新的卡片類型 Spec（`docs/specs/SPEC-001-<slug>.md`），放在 ADR 與 Task 之間，寫「具體怎麼做」：`## Scope`、`## Design`、`## Acceptance Criteria`。設計見 [decision 0009](docs/decisions/0009-spec-cards.md)。
+  - Spec 可以 `implements` ADR；Task 與 Milestone 可以 `implements` Spec。畫布拉線會自動推斷關聯方向。
+  - Spec 的 `adr_rev` 記錄撰寫時讀到的 ADR 內容。ADR 內文被修改後，卡片顯示「ADR 已修改」；只改 ADR 的 status、date 或 relates 不會觸發。
+  - 卡片與 Inspector 顯示驗收條件的完成數，例如 `3/5`。直接 implements 的 Task 全部完成時，Inspector 會依驗收紀錄提示可否標記 implemented。
+  - Spec 已 `approved` 或 `implemented`、但 ADR 不是 `accepted` 時發出 warning；Task 所實作的 ADR 底下有 `approved` 的 Spec 時，Inspector 會列出來供參考。
+- `nodit new spec`，以及輸出卡片 body 指紋的 `nodit rev <ID>`。
+- 被新 Spec `supersedes` 的 Spec，status 不是 `outdated` 時會發出 warning，跟 ADR 的 `superseded` 規則相同。
+
 ### Changed
+
+- AI 模板升到 `TEMPLATE_VERSION` 7：加入 Spec 的格式與修訂規則，新增 `/nodit-spec` skill，`/nodit-task` 補上 `--implements SPEC-xxx`。已 init 的專案重跑 `nodit init` 即可取得，也會建立 `docs/specs/`。
 
 - AI 模板升到 `TEMPLATE_VERSION` 6，review 的修改要求不會再藏在 Findings 以外。
   - 寫 review 時，所有要求修改、補充或做決定的事項，都要寫成 `## Findings` 底下的 `- [ ]` 項目。優先序與期限標在項目開頭，需要分組時用 `###`。

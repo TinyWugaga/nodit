@@ -6,6 +6,7 @@
   --blush: #ffcad4;
   --rose: #f4acb7;
   --mauve: #9d8189;
+  --lilac: #cdb8e0;
 
   --font-head: 'Geist Variable', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
   --font-body: 'Inter Variable', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
@@ -56,6 +57,7 @@
   --kind-adr: var(--rose);
   --kind-milestone: var(--peach);
   --kind-task: var(--sage);
+  --kind-spec: var(--lilac);
 
   --link-relates: var(--mauve);
   --link-implements: var(--rose);
@@ -91,6 +93,7 @@
   --kind-adr: #e8909f;
   --kind-milestone: #e2a07f;
   --kind-task: #8fab9b;
+  --kind-spec: #a993c4;
 
   --link-relates: #b9aaaf;
   --link-implements: #e8909f;
@@ -377,6 +380,9 @@ kbd {
 }
 .nav-item--task {
   --k: var(--kind-task);
+}
+.nav-item--spec {
+  --k: var(--kind-spec);
 }
 .nav-item svg {
   color: var(--k);
@@ -879,6 +885,9 @@ kbd {
 .menu__item--task {
   --k: var(--kind-task);
 }
+.menu__item--spec {
+  --k: var(--kind-spec);
+}
 
 @keyframes pop {
   from {
@@ -1046,6 +1055,9 @@ kbd {
 }
 .ins-head--task .pill--kind svg {
   color: var(--kind-task);
+}
+.ins-head--spec .pill--kind svg {
+  color: var(--kind-spec);
 }
 .ins-head--link .pill--kind {
   border-color: var(--c);
@@ -1258,6 +1270,9 @@ button.link-row:hover {
 .link-row--task {
   --k: var(--kind-task);
 }
+.link-row--spec {
+  --k: var(--kind-spec);
+}
 .link-row svg {
   color: var(--k);
 }
@@ -1304,6 +1319,9 @@ button.link-row:hover {
 }
 .spawn__btn--task {
   --k: var(--kind-task);
+}
+.spawn__btn--spec {
+  --k: var(--kind-spec);
 }
 
 .seg {
@@ -1477,6 +1495,9 @@ button.link-row:hover {
 .card--task {
   --k: var(--kind-task);
 }
+.card--spec {
+  --k: var(--kind-spec);
+}
 .card--task .frame {
   --fb: var(--low);
 }
@@ -1605,6 +1626,10 @@ button.link-row:hover {
   background: var(--lowest);
   color: var(--ink-3);
   font-size: 12px;
+}
+.tag--warn {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line-soft));
+  color: var(--accent-text);
 }
 .tag i {
   width: 7px;
@@ -1836,6 +1861,9 @@ button.link-row:hover {
 }
 .ins-head--task {
   --k: var(--kind-task);
+}
+.ins-head--spec {
+  --k: var(--kind-spec);
 }
 .ins-head--link {
   --k: var(--peach);
@@ -2131,6 +2159,16 @@ button.link-row:hover {
 }
 .ins-alert--conflict {
   border-left-color: var(--accent);
+}
+.ins-alert--hint {
+  border-left-color: var(--kind-spec);
+  background: var(--container);
+}
+.spec-adr[data-state='current'] {
+  color: var(--ink-3);
+}
+.spec-adr:not([data-state='current']) {
+  color: var(--accent-text);
 }
 .ins-alert p {
   display: flex;

@@ -1,5 +1,5 @@
 import type { NoditConfig } from './config'
-import type { CardKind, CardRecord, ReviewRecord, ReviewTargetState } from './domain'
+import type { CardKind, CardRecord, ReviewRecord, ReviewTargetState, SpecAdrState } from './domain'
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -24,7 +24,11 @@ export type ClientDoc = {
   stale?: boolean
   inferred: string[]
   writable: boolean
+  /** spec only: each implemented ADR's state against `adr_rev`, derived on the server on every scan */
+  specAdrs?: SpecAdr[]
 }
+
+export type SpecAdr = { id: string; state: SpecAdrState; docKey?: string }
 
 export type ReviewTarget = { id: string; state: ReviewTargetState; docKey?: string }
 

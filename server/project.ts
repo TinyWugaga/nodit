@@ -8,6 +8,7 @@ import { CARD_KINDS } from '../core/domain'
 import { sha1, toClientDoc, type ParsedDoc } from '../core/parse'
 import type { ClientReview, ComponentState, Diagnostic, Envelope, ProjectPayload, ProjectStatus } from '../core/protocol'
 import { linkReviews } from '../core/review'
+import { SPEC_LINK_CODES } from '../core/spec'
 import { crossValidate, readLayout, scanDocs, scanReviews, TMP_MARK, type LayoutFile } from '../core/scan'
 import { resolveReadable } from '../core/scope'
 import { findBlock } from '../core/init'
@@ -254,7 +255,7 @@ export class ProjectService extends EventEmitter {
 
   private docDiagChanged(k: string, d: ParsedDoc) {
     const prev = this.docs.get(k)
-    return !!prev && JSON.stringify(prev.diagnostics) !== JSON.stringify(d.diagnostics)
+    return !!prev && derivedOf(prev) !== derivedOf(d)
   }
 
   /** Apply a document the writer just persisted, then publish. Runs on the scan chain. */
@@ -304,7 +305,8 @@ export class ProjectService extends EventEmitter {
       // a card written or deleted through the UI changes which reviews are stale or dangling
       if (this.setReviews(linkReviews(this.reviews, docs))) changed.push('reviews')
       for (const [k, d] of this.docs) {
-        if (!changed.includes(k) && JSON.stringify(before.get(k)?.diagnostics) !== JSON.stringify(d.diagnostics)) changed.push(k)
+        const prev = before.get(k)
+        if (!changed.includes(k) && (!prev || derivedOf(prev) !== derivedOf(d))) changed.push(k)
       }
       this.rev++
       this.emit('change', this.envelope({ changed }) satisfies ChangeEvent)
@@ -316,7 +318,12 @@ export class ProjectService extends EventEmitter {
 
 const AI_PATHS = ['AGENTS.md', 'CLAUDE.md', ...SKILL_KINDS.map(skillPath)]
 
-export const CROSS_CODES = ['id-duplicate', 'link-dangling', 'supersede-status']
+export const CROSS_CODES = ['id-duplicate', 'link-dangling', 'supersede-status', ...SPEC_LINK_CODES]
+
+/** parts of a doc that other documents can change without its own file changing */
+function derivedOf(d: ParsedDoc) {
+  return JSON.stringify([d.diagnostics, d.specAdrs])
+}
 
 async function fileRevision(root: string, rel: string) {
   try {
