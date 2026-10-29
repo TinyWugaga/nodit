@@ -190,7 +190,7 @@ describe('specs through the project service', () => {
     root = await mkdtemp(path.join(tmpdir(), 'nodit-spec-'))
     await cp(path.resolve(__dirname, '../examples/demo'), root, {
       recursive: true,
-      filter: (src) => !/[\\/]\.nodit[\\/](writer\.lock|owner\.json|token)/.test(src),
+      filter: (src) => !/[\\/]\.nodit[\\/](writer\.lock|owner\.json|token)|[\\/]docs[\\/]specs[\\/]/.test(src),
     })
     const rev = bodyBlobHash(await readFile(path.join(root, ADR1)))
     await mkdir(path.join(root, 'docs/specs'), { recursive: true })

@@ -39,7 +39,7 @@ afterEach(async () => {
 
 it('dropping a card into another column saves its status together with the pending title', async () => {
   const { useProject } = await import('../src/store')
-  await vi.waitFor(() => expect(useProject.getState().docs).toHaveLength(11))
+  await vi.waitFor(() => expect(useProject.getState().docs).toHaveLength(14))
   const s = useProject.getState()
   const doc = s.docs.find((d) => d.card?.id === 'T-003')!
   const file = path.join(root, doc.path)

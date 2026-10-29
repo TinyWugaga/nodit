@@ -15,7 +15,7 @@ beforeEach(async()=>{
  vi.stubGlobal('fetch',(url:string,init:RequestInit={})=>{if(staleLayout&&url==='/api/layout'&&init.method==='PUT')return Promise.resolve(new Response(JSON.stringify({projectId:s.project.projectId,sessionId:s.project.sessionId,rev:0,revision:'stale-revision'}),{status:200}));if(injectPath&&url===injectPath&&init.method==='PATCH')return Promise.resolve(new Response(JSON.stringify({error:'injected one-file failure'}),{status:500}));const base=`http://127.0.0.1:${s.port}`;return nativeFetch(new URL(url,base),{...init,headers:{...init.headers,Origin:base}})});localStorage.clear();injectPath='';staleLayout=false
 })
 afterEach(async()=>{vi.unstubAllGlobals();await s.close();await rm(root,{recursive:true,force:true})})
-async function store(){const {useProject}=await import('../src/store');await vi.waitFor(()=>expect(useProject.getState().docs).toHaveLength(11));return useProject}
+async function store(){const {useProject}=await import('../src/store');await vi.waitFor(()=>expect(useProject.getState().docs).toHaveLength(14));return useProject}
 it('C01 UI delete action clears all incoming references when selected',async()=>{
  const storeApi=await store(),state=storeApi.getState(),d=state.docs.find(d=>d.card?.id==='MS-01')!;const refs=state.referencesTo(d.docKey);expect(refs).toHaveLength(3);
  expect(await state.deleteCard(d.docKey,true)).toBe(true);await expect(stat(path.join(root,d.path))).rejects.toThrow();

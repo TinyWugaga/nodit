@@ -15,7 +15,7 @@ beforeEach(async()=>{
 })
 afterEach(async()=>{release();vi.unstubAllGlobals();await s.close();await rm(root,{recursive:true,force:true})})
 it('V04 graph node follows the newest layout after an old own ACK settles',async()=>{
- const {useProject:st}=await import('../src/store');await vi.waitFor(()=>expect(st.getState().docs).toHaveLength(11));const n=st.getState().nodes.find(n=>n.data.code==='T-003')!;hold=true;st.getState().onNodesChange([{type:'position',id:n.id,position:{x:100,y:120}}]);st.getState().onNodeDragStop();await ackReady;
+ const {useProject:st}=await import('../src/store');await vi.waitFor(()=>expect(st.getState().docs).toHaveLength(14));const n=st.getState().nodes.find(n=>n.data.code==='T-003')!;hold=true;st.getState().onNodesChange([{type:'position',id:n.id,position:{x:100,y:120}}]);st.getState().onNodeDragStop();await ackReady;
  const file=path.join(root,'.nodit/layout.json'),data=JSON.parse(await readFile(file,'utf8'));data['T-003']={x:500,y:120};await writeFile(file,JSON.stringify(data));await s.project.rescan();await vi.waitFor(()=>expect(st.getState().layout['T-003'].x).toBe(500));release();await new Promise(r=>setTimeout(r,150));
  expect(st.getState().layout['T-003'].x).toBe(500);await vi.waitFor(()=>expect(st.getState().nodes.find(n=>n.data.code==='T-003')?.position.x).toBe(500),{timeout:1200})
 })
