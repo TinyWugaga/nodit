@@ -82,6 +82,7 @@ const SECTION_SOURCE: Record<CardKind, [string, string][]> = {
   ],
   milestone: [['Goal', 'goal']],
   task: [['Description', 'description']],
+  spec: [],
 }
 
 export function importFingerprint(text: string) {

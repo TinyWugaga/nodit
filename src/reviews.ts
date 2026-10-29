@@ -32,6 +32,16 @@ export function countFindings(body: string): FindingCount | null {
   return acc
 }
 
+/**
+ * Checklist items anywhere in a markdown fragment, with the same rules as `countFindings`. `null`
+ * when the fragment has no checklist at all.
+ */
+export function countChecklist(markdown: string): FindingCount | null {
+  const acc = { open: 0, total: 0 }
+  countTasks(new Lexer({ gfm: true }).lex(markdown), acc)
+  return acc.total ? acc : null
+}
+
 export const isValidReview = (r: ClientReview) => Boolean(r.review) && !r.diagnostics.some((d) => d.level === 'error')
 
 export function reviewsFor(reviews: ClientReview[], cardId: string) {

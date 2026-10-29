@@ -3,14 +3,14 @@ import { Hand, Maximize, Minus, MousePointer2, Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { isTyping, useAddCard } from '../hooks'
+import { CARD_KINDS } from '../../core/domain'
 import { KIND_META } from '../presentation'
 import { useProject } from '../store'
 import type { CardKind } from '../types'
 import { Frame } from './Frame'
 import { KindIcon } from './KindIcon'
 
-const KINDS: CardKind[] = ['adr', 'milestone', 'task']
-const ADD_KEYS: Record<string, CardKind> = { a: 'adr', m: 'milestone', t: 'task' }
+const ADD_KEYS: Record<string, CardKind> = Object.fromEntries(CARD_KINDS.map((k) => [k[0], k]))
 const FIT = { duration: 400, padding: 0.15 }
 
 export function Toolbar() {
@@ -82,7 +82,7 @@ export function Toolbar() {
           <div className="menu" role="menu">
             <Frame />
             <span className="menu__title label-caps">Add node · 寫入 docs/</span>
-            {KINDS.map((k) => (
+            {CARD_KINDS.map((k) => (
               <button
                 key={k}
                 type="button"

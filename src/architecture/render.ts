@@ -1,5 +1,6 @@
 import type { DOMPurify } from 'dompurify'
 import { Marked, type Token, type Tokens } from 'marked'
+import { CARD_KINDS, ID_PREFIX_SOURCE, ID_RULES } from '../../core/domain'
 
 export type TocEntry = { id: string; text: string; level: number }
 export type TreeLine = { name: string; desc: string; children: TreeLine[] }
@@ -8,8 +9,8 @@ export type RenderedDoc = { html: string; toc: TocEntry[]; mermaid: string[]; tr
 
 export const TREE_LANG = 'nodit-tree'
 
-const CARD_RE = /^(?:ADR-\d{3,}|MS-\d{2,}|T-\d{3,})(?![\w-])/
-const CARD_START = /(?:ADR|MS|T)-\d/
+const CARD_RE = new RegExp(`^(?:${CARD_KINDS.map((k) => `${ID_RULES[k].prefix}\\d{${ID_RULES[k].pad},}`).join('|')})(?![\\w-])`)
+const CARD_START = new RegExp(`(?:${ID_PREFIX_SOURCE})-\\d`)
 
 type CardRefToken = { type: 'cardRef'; raw: string; id: string }
 

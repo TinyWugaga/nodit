@@ -1,7 +1,7 @@
-import { CircleCheck, Flag, Signpost } from 'lucide-react'
+import { CircleCheck, FileCode, Flag, Signpost } from 'lucide-react'
 import type { CardKind } from '../types'
 
-const ICONS = { adr: Signpost, milestone: Flag, task: CircleCheck }
+const ICONS = { adr: Signpost, milestone: Flag, task: CircleCheck, spec: FileCode }
 
 export function KindIcon({ kind, size = 14 }: { kind: CardKind; size?: number }) {
   const Icon = ICONS[kind]

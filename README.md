@@ -1,6 +1,6 @@
 # Nodit
 
-把專案 `docs/` 裡的 ADR、Milestone、Task 畫成可編輯的關聯圖。markdown 檔是唯一的資料來源：在 UI 上的修改會以最小 diff 寫回檔案，人或 AI 直接改檔案時，圖也會即時更新。
+把專案 `docs/` 裡的 ADR、Spec、Milestone、Task 畫成可編輯的關聯圖。markdown 檔是唯一的資料來源：在 UI 上的修改會以最小 diff 寫回檔案，人或 AI 直接改檔案時，圖也會即時更新。
 
 - **Graph Canvas**：卡片、連線、拖曳排版、Inspector 編輯、診斷面板。
 - **Architecture**：渲染 `docs/ARCHITECTURE.md`，支援 mermaid，文中的 `ADR-001`、`MS-01`、`T-001` 會自動連到卡片。
@@ -58,7 +58,8 @@ nodit
 | --- | --- |
 | `nodit [dir] [--port 4319]` | 開啟專案，預設是目前目錄 |
 | `nodit init [dir] [--no-ai] [--yes] [--dry-run]` | 初始化：`nodit.config.json`、卡片資料夾、`docs/ARCHITECTURE.md`、`.gitignore`，以及 AI 指令檔與 skills（`--no-ai` 時略過） |
-| `nodit new <adr\|milestone\|task> "<標題>" [選項]` | 新建卡片並配發不重複的編號 |
+| `nodit new <adr\|milestone\|task\|spec> "<標題>" [選項]` | 新建卡片並配發不重複的編號 |
+| `nodit rev <ID> [--dir <path>]` | 輸出卡片 body（frontmatter 之後）的指紋，寫進 Spec 的 `adr_rev` |
 | `nodit import <file.json> [dir]` | 匯入舊版 localStorage 匯出的 JSON |
 | `nodit --version`、`nodit -v` | 顯示版本 |
 
@@ -68,7 +69,7 @@ nodit
 
 - `--dir <path>`：專案目錄。
 - `--status <status>`：初始狀態。
-- `--implements <ID>`、`--depends <ID>`、`--supersedes <ADR-ID>`、`--relates <ID>`：建立關聯，可以重複指定。
+- `--implements <ID>`、`--depends <ID>`、`--supersedes <ID>`、`--relates <ID>`：建立關聯，可以重複指定。
 - `--milestone <MS-ID>`：Task 所屬的 milestone。
 - `--json`：以 JSON 輸出結果。
 
@@ -96,6 +97,7 @@ nodit
 | ADR | `docs/decisions/ADR-001-<slug>.md` | proposed / accepted / deprecated / superseded |
 | Milestone | `docs/milestones/MS-01-<slug>.md` | planned / active / done |
 | Task | `docs/tasks/T-001-<slug>.md` | todo / doing / blocked / done |
+| Spec | `docs/specs/SPEC-001-<slug>.md` | draft / approved / implemented / outdated |
 
 ```markdown
 ---
@@ -115,7 +117,8 @@ depends: [T-011]
 ```
 
 - 關聯寫在來源端的 frontmatter：`implements`、`milestone`、`depends`、`supersedes`、`relates`。
-- 受管段落：ADR 是 `## Context`、`## Decision`、`## Consequences`；Milestone 是 `## Goal`；Task 是 `## Description`。
+- 受管段落：ADR 是 `## Context`、`## Decision`、`## Consequences`；Milestone 是 `## Goal`；Task 是 `## Description`；Spec 是 `## Scope`、`## Design`、`## Acceptance Criteria`。
+- Spec 的 `adr_rev` 記錄撰寫時讀到的 ADR 內容指紋（只算 body，不含 frontmatter）。ADR 內文之後被修改時，Spec 卡片會顯示「ADR 已修改」。設計見 [docs/decisions/0009-spec-cards.md](docs/decisions/0009-spec-cards.md)。
 - 其他自訂欄位與段落都會原樣保留。
 - 路徑可以在 `nodit.config.json` 的 `paths` 調整。
 - 卡片座標存在 `.nodit/layout.json`，可以進版控。

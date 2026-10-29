@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import { parseDocument } from 'yaml'
+import { isMap, isScalar, parseDocument } from 'yaml'
 import {
   formatId,
+  ID_PREFIX_SOURCE,
   ID_RULES,
   isStatus,
   kindOfId,
@@ -20,8 +21,11 @@ import { splitDoc } from './frontmatter'
 import type { ClientDoc, Diagnostic, SectionView } from './protocol'
 import { findHeadings, readSections, type SectionState } from './sections'
 
-/** `blob` is the SHA-1 git blob hash of the file, compared against a review's `target_rev`. */
-export type ParsedDoc = ClientDoc & { sectionStates: Record<string, SectionState>; blob?: string }
+/**
+ * `blob` is the SHA-1 git blob hash of the file, compared against a review's `target_rev`;
+ * `bodyBlob` hashes only the body, compared against a spec's `adr_rev`. Both stay on the server.
+ */
+export type ParsedDoc = ClientDoc & { sectionStates: Record<string, SectionState>; blob?: string; bodyBlob?: string }
 
 export function sha1(data: string | Buffer) {
   return createHash('sha1').update(data).digest('hex')
@@ -30,6 +34,16 @@ export function sha1(data: string | Buffer) {
 /** SHA-1 git blob hash (`git hash-object` in a SHA-1 repository), independent of any repository setting. */
 export function gitBlobHash(buf: Buffer) {
   return createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex')
+}
+
+/**
+ * Git blob hash of the raw bytes after the frontmatter's closing fence, or of the whole file when it
+ * has no (terminated) frontmatter. Frontmatter edits such as status, date or relates do not change it.
+ */
+export function bodyBlobHash(buf: Buffer) {
+  const split = splitDoc(buf.toString('utf8'))
+  if (!split.fm) return gitBlobHash(buf)
+  return gitBlobHash(buf.subarray(Buffer.byteLength(split.raw.slice(0, split.bodyStart), 'utf8')))
 }
 
 export function docKeyOf(relPath: string) {
@@ -41,6 +55,9 @@ export function revisionOf(buf: Buffer) {
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
+const BLOB = /^[0-9a-f]{40}$/
+const FILE_ID = new RegExp(`^(${ID_PREFIX_SOURCE})-(\\d+)`, 'i')
+const TITLE_ID = new RegExp(`^(${ID_PREFIX_SOURCE})?-?\\d+\\s*[—:-]\\s*`, 'i')
 
 function toView(s: SectionState): SectionView {
   return s.state === 'ok' ? { state: 'ok', text: s.text } : s
@@ -55,7 +72,7 @@ function strList(v: unknown): string[] | null {
 
 function inferIdFromFilename(file: string, kind: CardKind): string | undefined {
   const base = path.posix.basename(file)
-  const explicit = /^(ADR|MS|T)-(\d+)/i.exec(base)
+  const explicit = FILE_ID.exec(base)
   if (explicit) {
     const k = kindOfId(`${explicit[1].toUpperCase()}-${explicit[2].padStart(ID_RULES[kind].pad, '0')}`)
     if (k === kind) return formatId(kind, Number(explicit[2]))
@@ -78,6 +95,7 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
     kind,
     revision: revisionOf(buf),
     blob: gitBlobHash(buf),
+    bodyBlob: bodyBlobHash(buf),
     sectionStates,
     sections: Object.fromEntries(Object.entries(sectionStates).map(([k, v]) => [k, toView(v)])),
     diagnostics,
@@ -92,7 +110,7 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
   if (!split.fm) {
     const id = inferIdFromFilename(relPath, kind)
     const h1 = findHeadings(raw.slice(split.bodyStart), split.bodyStart).find((h) => h.level === 1)
-    const title = h1?.name.replace(/^(ADR|MS|T)?-?\d+\s*[—:-]\s*/i, '') || path.posix.basename(relPath, '.md')
+    const title = h1?.name.replace(TITLE_ID, '') || path.posix.basename(relPath, '.md')
     diag('warning', 'legacy', '沒有 frontmatter：以唯讀顯示，欄位為推測值')
     const card: CardRecord | undefined = id
       ? { id, type: kind, title, status: STATUSES[kind][0], links: { implements: [], depends: [], supersedes: [], relates: [] } }
@@ -155,6 +173,23 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
     else links[field as 'implements' | 'depends' | 'supersedes' | 'relates'] = list
   }
 
+  let adrRev: Record<string, string> | undefined
+  if (kind === 'spec' && data.adr_rev !== undefined) {
+    adrRev = {}
+    const node = doc.get('adr_rev', true)
+    if (!isMap(node)) diag('error', 'spec-rev-invalid', 'adr_rev 必須是「ADR ID: 指紋」的對照表')
+    else {
+      for (const pair of node.items) {
+        const key = isScalar(pair.key) ? String(pair.key.value) : ''
+        // plain scalars keep their source text: an all-digit or 12e45-like hash would otherwise become a number
+        const value = isScalar(pair.value) ? (pair.value.type === 'PLAIN' ? pair.value.source : pair.value.value) : undefined
+        if (typeof value !== 'string' || !BLOB.test(value)) diag('error', 'spec-rev-invalid', `adr_rev.${key} 必須是 40 字元小寫 hex`)
+        else if (!links.implements.includes(key)) diag('warning', 'spec-rev-unknown', `adr_rev.${key} 不在 implements 內，已忽略`)
+        else adrRev[key] = value
+      }
+    }
+  }
+
   const hasError = diagnostics.some((d) => d.level === 'error')
   const coreOk = typeof id === 'string' && ID_RULES[kind].pattern.test(id) && typeof data.title === 'string' && isStatus(kind, data.status)
   const card: CardRecord | undefined = coreOk
@@ -167,6 +202,7 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
         due: typeof data.due === 'string' ? data.due : undefined,
         priority: (PRIORITIES as readonly unknown[]).includes(data.priority) ? (data.priority as CardRecord['priority']) : undefined,
         assignee: typeof data.assignee === 'string' ? data.assignee : undefined,
+        ...(kind === 'spec' ? { adrRev: adrRev ?? {} } : {}),
         links,
       }
     : undefined
@@ -175,8 +211,9 @@ export function parseDoc(relPath: string, buf: Buffer, kind: CardKind): ParsedDo
 }
 
 export function toClientDoc(d: ParsedDoc): ClientDoc {
-  const { sectionStates: _omit, blob: _blob, ...rest } = d
+  const { sectionStates: _omit, blob: _blob, bodyBlob: _body, ...rest } = d
   void _omit
   void _blob
+  void _body
   return rest
 }

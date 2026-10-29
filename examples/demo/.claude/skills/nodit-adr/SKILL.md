@@ -1,7 +1,7 @@
 ---
 name: nodit-adr
 description: 在這個專案新增、修改或取代架構決策紀錄（ADR）時使用。依 Nodit 格式寫入 ADR 檔案，並處理 supersedes。
-# nodit-managed v6
+# nodit-managed v7
 ---
 
 # 新增或修改架構決策紀錄（ADR）（Nodit 格式）

@@ -1,10 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { CARD_KINDS, LINK_FIELD, type CardKind } from './domain'
+import { CARD_KINDS, LINK_FIELD, SUPERSEDED_STATUS, type CardKind } from './domain'
 import type { NoditConfig } from './config'
 import { docKeyOf, parseDoc, sha1, type ParsedDoc } from './parse'
 import type { ClientReview, Diagnostic } from './protocol'
 import { parseReview } from './review'
+import { linkSpecs } from './spec'
 import { resolveReadable, ScopeError } from './scope'
 
 export const TMP_MARK = '.nodit-tmp-'
@@ -104,13 +105,14 @@ export function crossValidate(docs: ParsedDoc[]): { docs: ParsedDoc[]; diagnosti
   const diagnostics: Diagnostic[] = []
   const supersededBy = new Map<string, string[]>()
   for (const d of docs) {
-    if (d.card?.type !== 'adr') continue
+    if (!d.card || !SUPERSEDED_STATUS[d.card.type]) continue
     for (const old of d.card.links.supersedes) supersededBy.set(old, [...(supersededBy.get(old) ?? []), d.card.id])
   }
   const out = docs.map((d) => {
     const extra: Diagnostic[] = []
     const by = d.card && supersededBy.get(d.card.id)
-    if (d.card?.type === 'adr' && by && d.card.status !== 'superseded') {
+    const expected = d.card && SUPERSEDED_STATUS[d.card.type]
+    if (d.card && expected && by && d.card.status !== expected) {
       extra.push({
         level: 'warning',
         code: 'supersede-status',
@@ -152,7 +154,8 @@ export function crossValidate(docs: ParsedDoc[]): { docs: ParsedDoc[]; diagnosti
       writable: d.writable && !extra.some((x) => x.level === 'error'),
     }
   })
-  return { docs: out, diagnostics }
+  const specs = linkSpecs(out)
+  return { docs: specs.docs, diagnostics: [...diagnostics, ...specs.diagnostics] }
 }
 
 export type LayoutFile = { revision: string; data: Record<string, { x: number; y: number }> }

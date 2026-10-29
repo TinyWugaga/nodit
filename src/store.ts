@@ -14,7 +14,7 @@ import type { LinkChange, Meta } from './data/client'
 import { DraftManager, type DraftView } from './data/drafts'
 import { HttpProjectClient, SECTION_PREFIX } from './data/httpClient'
 import { ProjectSync } from './data/sync'
-import { KIND_META, LINK_META } from './presentation'
+import { assertNever, KIND_META, LINK_META } from './presentation'
 import type { CardData, CardNode, LinkEdge } from './types'
 
 export const LEGACY_STORAGE_KEY = 'nodit:project'
@@ -109,7 +109,7 @@ type State = {
 
 const client = new HttpProjectClient()
 
-const COLUMN_X: Record<CardKind, number> = { adr: 0, milestone: 460, task: 920 }
+const COLUMN_X: Record<CardKind, number> = { adr: 0, milestone: 460, task: 920, spec: 1380 }
 
 function sectionView(doc: ClientDoc, draft: DraftView | undefined, name: string) {
   const key = SECTION_PREFIX + name
@@ -137,27 +137,41 @@ function toCardData(doc: ClientDoc, draft: DraftView | undefined): CardData | nu
     draft,
   }
   const sec = (name: string) => sectionView(doc, draft, name)
-  if (c.type === 'adr') {
-    return {
-      ...base,
-      kind: 'adr',
-      status: pick('status', c.status) as never,
-      date: pick('date', c.date),
-      context: sec('Context'),
-      decision: sec('Decision'),
-      consequences: sec('Consequences'),
-    }
-  }
-  if (c.type === 'milestone') {
-    return { ...base, kind: 'milestone', status: pick('status', c.status) as never, dueDate: pick('due', c.due), goal: sec('Goal') }
-  }
-  return {
-    ...base,
-    kind: 'task',
-    status: pick('status', c.status) as never,
-    priority: (pick('priority', c.priority) || 'medium') as never,
-    assignee: pick('assignee', c.assignee),
-    description: sec('Description'),
+  switch (c.type) {
+    case 'adr':
+      return {
+        ...base,
+        kind: 'adr',
+        status: pick('status', c.status) as never,
+        date: pick('date', c.date),
+        context: sec('Context'),
+        decision: sec('Decision'),
+        consequences: sec('Consequences'),
+      }
+    case 'milestone':
+      return { ...base, kind: 'milestone', status: pick('status', c.status) as never, dueDate: pick('due', c.due), goal: sec('Goal') }
+    case 'task':
+      return {
+        ...base,
+        kind: 'task',
+        status: pick('status', c.status) as never,
+        priority: (pick('priority', c.priority) || 'medium') as never,
+        assignee: pick('assignee', c.assignee),
+        description: sec('Description'),
+      }
+    case 'spec':
+      return {
+        ...base,
+        kind: 'spec',
+        status: pick('status', c.status) as never,
+        date: pick('date', c.date),
+        scope: sec('Scope'),
+        design: sec('Design'),
+        criteria: sec('Acceptance Criteria'),
+        adrStates: doc.specAdrs ?? [],
+      }
+    default:
+      return assertNever(c.type)
   }
 }
 
@@ -180,7 +194,7 @@ function buildNodes(
   drafts: DraftManager,
 ): CardNode[] {
   const prevById = new Map(prev.map((n) => [n.id, n]))
-  const column: Record<CardKind, number> = { adr: 0, milestone: 0, task: 0 }
+  const column: Record<CardKind, number> = { adr: 0, milestone: 0, task: 0, spec: 0 }
   const out: CardNode[] = []
   for (const doc of docs) {
     const data = toCardData(doc, drafts.view(doc.docKey))
