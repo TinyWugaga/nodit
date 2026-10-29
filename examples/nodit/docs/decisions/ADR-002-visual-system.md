@@ -32,11 +32,9 @@ date: 2026-10-20
   - `implements` 與選取中的連線加 glow。
   - `implements`、`part-of`、`depends` 三種連線帶流動粒子（`animateMotion`），reduced-motion 時隱藏。
 
-
 ### 不採用
 
 參考稿中沒有對應功能的元件不做：Decision Matrix / Timeline 分頁、分享、使用者頭像、討論串。
-
 
 ### 修訂（2026-10-20）：HUD 元件語言
 
@@ -53,4 +51,3 @@ date: 2026-10-20
 - **字級整體放大**：內文 13 → 14、mono 12 → 13、label 11 → 12、卡片標題 15 → 17。卡片寬度 300 → 320。
 
 ## Consequences
-

@@ -53,7 +53,6 @@ relates: [ADR-003]
   - 可瀏覽的根目錄預設為使用者家目錄（`os.homedir()`），不能預設暴露整台電腦的目錄結構。repo 通常不會都放在同一個上層資料夾，所以不用啟動目錄的上一層。
   - 沿用 loopback、Host、Origin 檢查。
 
-
 ### 實作細節（2026-10-22）
 
 - **可替換的參照**：`server/server.ts` 把 `ProjectService`、`Owner`、`Writer`、`EventHub`、init 計畫收成一個 `ProjectContext`，`current` 指向目前的那一組。每個請求開頭取一次 `current`，整個請求只用這一組，不會中途混用兩個專案。`RunningServer.owner`／`project` 改成 getter，永遠回傳目前的專案。

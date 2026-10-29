@@ -29,14 +29,12 @@ relates: [ADR-003]
 - **授權**：MIT（2026-10-23 決定），`LICENSE` 放在 repo 根目錄，npm 會自動把它打包進套件。
 - **npx 規則**：AI 模板改成「專案把 Nodit 裝成 devDependency 時用 `npx --no nodit`；不要用不帶 `--no` 的 npx」。`--no` 在本地找不到套件時會中止，不會下載（npm 12.0.0 實測：`npx --no cowsay` 回報 `npx canceled due to missing packages and no YES option`）。`TEMPLATE_VERSION` 升為 2，已 init 的專案會在 init 面板看到 Update。
 
-
 ### 首次發佈（2026-10-23）
 
 - `0.1.0` 由帳號持有人在 `main` 的 `92c26fd` 手動執行 `npm publish --access public --tag latest`，2FA 以網頁驗證完成。
 - npm 12.0.0 無法 publish：它的 tarball 漏打包 `sigstore`，`libnpmpublish` 載入時回報 `Cannot find module 'sigstore'`。npm 12.2.1 已修正，發佈前要確認 npm 版本不是 12.0.0。
 - npm 要求帳號開 2FA，或使用可略過 2FA 的 granular access token，才能 publish；沒有時回 403。
 - 上傳成功後 registry 回 202，需要幾分鐘處理才查得到；處理期間 `npm search` 會顯示 `0.0.0-stage` 暫存佔位版本。
-
 
 ### 自動發佈（2026-10-23）
 
@@ -67,7 +65,6 @@ relates: [ADR-003]
   - workflow：`.github/workflows/publish.yml`
   - builder：GitHub-hosted runner
 - 從 registry 安裝後，`npm audit signatures` 顯示簽章與 attestation 都驗證通過。
-
 
 ### 尚未處理
 
