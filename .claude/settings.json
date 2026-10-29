@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/docs/decisions/*|\"$CLAUDE_PROJECT_DIR\"/docs/reviews/*) cd \"$CLAUDE_PROJECT_DIR\" && npx tsx scripts/sync-example.ts ;; esac",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/docs/decisions/*|\"$CLAUDE_PROJECT_DIR\"/docs/specs/*|\"$CLAUDE_PROJECT_DIR\"/docs/reviews/*) cd \"$CLAUDE_PROJECT_DIR\" && npx tsx scripts/sync-example.ts ;; esac",
             "timeout": 60,
             "statusMessage": "Syncing examples/nodit"
           }

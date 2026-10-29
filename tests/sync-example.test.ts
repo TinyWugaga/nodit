@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { loadConfig } from '../core/config'
 import { crossValidate, scanDocs, scanReviews } from '../core/scan'
-import { convertAdr, convertReview, EXAMPLE, syncExample } from '../scripts/sync-example'
+import { convertAdr, convertReview, convertSpec, EXAMPLE, SyncError, syncExample } from '../scripts/sync-example'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
@@ -46,6 +46,42 @@ describe('convertAdr', () => {
     expect(content).toContain('### 實作細節\n\n#### 子項')
     expect(content).toContain('```sh\n## not a heading\n```')
     expect(content).toMatch(/\n## Consequences\n$/)
+  })
+})
+
+describe('convertSpec', () => {
+  const hash = 'a'.repeat(40)
+  const src = [
+    '# 0003 — Job 規格',
+    '',
+    '- 狀態：Approved',
+    '- 日期：2026-10-29',
+    '- 實作：[0010 從卡片觸發](../decisions/0010-review-from-card.md)',
+    `- adr_rev：0010 \`${hash}\``,
+    '',
+    '前言。',
+    '',
+    '## Scope',
+    '',
+    '範圍。',
+    '',
+    '## Design',
+    '',
+    '設計。',
+    '',
+  ].join('\n')
+
+  it('maps the header bullets to spec frontmatter and folds the intro into Scope', () => {
+    const spec = convertSpec('0003-review-job.md', src)
+    expect(spec.rel).toBe('docs/specs/SPEC-003-review-job.md')
+    expect(spec.content).toBe(
+      `---\nid: SPEC-003\ntype: spec\ntitle: Job 規格\nstatus: approved\ndate: 2026-10-29\nimplements: [ADR-010]\nadr_rev:\n  ADR-010: ${hash}\n---\n\n## Scope\n\n前言。\n\n範圍。\n\n## Design\n\n設計。\n`,
+    )
+  })
+
+  it('omits adr_rev when the header has none and rejects an unknown status', () => {
+    expect(convertSpec('0003-x.md', src.replace(/^- adr_rev.*\n/m, '')).content).not.toContain('adr_rev')
+    expect(() => convertSpec('0003-x.md', src.replace('Approved', 'Accepted'))).toThrow(SyncError)
   })
 })
 

@@ -6,25 +6,34 @@ import { stringify } from 'yaml'
 import { findHeadings } from '../core/sections'
 
 // Mirrors the project's own docs/ into examples/nodit in Nodit's card format.
-// docs/decisions and docs/reviews under the example are generated: hand edits there are overwritten.
+// docs/decisions, docs/specs and docs/reviews under the example are generated: hand edits there are overwritten.
 export const EXAMPLE = 'examples/nodit'
-const SOURCES = { adr: 'docs/decisions', review: 'docs/reviews' }
+const SOURCES = { adr: 'docs/decisions', spec: 'docs/specs', review: 'docs/reviews' }
 const REVIEWER = 'claude'
 const LAYOUT = '.nodit/layout.json'
 const LAYOUT_STEP = 210
+const SPEC_COLUMN = -460
 
 const ADR_STATUS: Record<string, string> = { Accepted: 'accepted', Proposed: 'proposed', Deprecated: 'deprecated', Superseded: 'superseded' }
 const ADR_SECTIONS: Record<string, string> = { 決策: 'Decision', 影響: 'Consequences', 後果: 'Consequences' }
+const SPEC_STATUS: Record<string, string> = { Draft: 'draft', Approved: 'approved', Implemented: 'implemented', Outdated: 'outdated' }
 
 export class SyncError extends Error {}
 
 const adrId = (num: string) => `ADR-${String(Number(num)).padStart(3, '0')}`
+const specId = (num: string) => `SPEC-${String(Number(num)).padStart(3, '0')}`
 const scalar = (v: string) => stringify(v).trimEnd()
 
-function frontmatter(fields: [string, string | string[] | undefined][]) {
+type Field = string | string[] | Record<string, string> | undefined
+
+function frontmatter(fields: [string, Field][]) {
   const lines = fields
-    .filter(([, v]) => v !== undefined && v.length > 0)
-    .map(([k, v]) => `${k}: ${Array.isArray(v) ? `[${v.join(', ')}]` : v}`)
+    .filter(([, v]) => v !== undefined && (typeof v === 'string' || Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0))
+    .map(([k, v]) => {
+      if (typeof v === 'string') return `${k}: ${v}`
+      if (Array.isArray(v)) return `${k}: [${v.join(', ')}]`
+      return `${k}:\n${Object.entries(v!).map(([a, b]) => `  ${a}: ${b}`).join('\n')}`
+    })
   return `---\n${lines.join('\n')}\n---\n`
 }
 
@@ -78,6 +87,41 @@ export function convertAdr(name: string, src: string) {
   return { id, rel: `${SOURCES.adr}/${id}-${name.replace(/^\d{4}-/, '')}`, content: `${fm}\n## Context\n${head}${body}` }
 }
 
+const SPEC_HEADER = /^- (?:狀態|日期|實作|adr_rev)：.*\n?/gm
+
+export function convertSpec(name: string, src: string) {
+  const m = /^# (\d{4}) — (.+)\n/.exec(src)
+  if (!m) throw new SyncError(`${name}：第一行不是「# NNNN — 標題」`)
+  const id = specId(m[1])
+  const { head, sections: rest } = sections(src.slice(m[0].length))
+
+  const status = /^- 狀態：(\w+)/m.exec(head)?.[1]
+  if (!status || !SPEC_STATUS[status]) throw new SyncError(`${name}：找不到可辨識的「- 狀態：」`)
+  const date = /^- 日期：(\d{4}-\d{2}-\d{2})/m.exec(head)?.[1]
+  if (!date) throw new SyncError(`${name}：找不到「- 日期：YYYY-MM-DD」`)
+  const implementsLine = /^- 實作：(.+)$/m.exec(head)?.[1] ?? ''
+  const implementsIds = [...implementsLine.matchAll(/\b(\d{4})\b/g)].map((n) => adrId(n[1])).filter((r, i, all) => all.indexOf(r) === i)
+  const adrRev = Object.fromEntries(
+    [.../^- adr_rev：(.+)$/m.exec(head)?.[1].matchAll(/\b(\d{4})\s+`?([0-9a-f]{40})`?/g) ?? []].map((r) => [adrId(r[1]), r[2]]),
+  )
+
+  // Header bullets become frontmatter; any other text before the first section opens Scope.
+  const intro = head.replace(SPEC_HEADER, '').trim()
+  const body = rest
+    .map((s) => (intro && s.startsWith('## Scope\n') ? s.replace(/^## Scope\n\n?/, `## Scope\n\n${intro}\n\n`) : s))
+    .join('')
+  const fm = frontmatter([
+    ['id', id],
+    ['type', 'spec'],
+    ['title', scalar(m[2].trim())],
+    ['status', SPEC_STATUS[status]],
+    ['date', date],
+    ['implements', implementsIds],
+    ['adr_rev', adrRev],
+  ])
+  return { id, implements: implementsIds, rel: `${SOURCES.spec}/${id}-${name.replace(/^\d{4}-/, '')}`, content: `${fm}\n${body}` }
+}
+
 export function convertReview(name: string, src: string) {
   const m = /^(\d{4}-\d{2}-\d{2})-(\d{4})-/.exec(name)
   if (!m) throw new SyncError(`${name}：檔名不是「YYYY-MM-DD-NNNN-…」`)
@@ -123,6 +167,12 @@ export async function buildExample(root: string) {
     out.set(adr.rel, adr.content)
     ids.push(adr.id)
   }
+  const specs: { id: string; implements: string[] }[] = []
+  for (const name of await markdownIn(join(root, SOURCES.spec))) {
+    const spec = convertSpec(name, await readFile(join(root, SOURCES.spec, name), 'utf8'))
+    out.set(spec.rel, spec.content)
+    specs.push(spec)
+  }
   for (const name of await markdownIn(join(root, SOURCES.review))) {
     const review = convertReview(name, await readFile(join(root, SOURCES.review, name), 'utf8'))
     out.set(review.rel, review.content)
@@ -131,6 +181,8 @@ export async function buildExample(root: string) {
   const layoutPath = join(root, EXAMPLE, LAYOUT)
   const layout = JSON.parse(await readFile(layoutPath, 'utf8').catch(() => '{}')) as Record<string, { x: number; y: number }>
   for (const [i, id] of ids.entries()) layout[id] ??= { x: 0, y: i * LAYOUT_STEP }
+  // A new spec sits left of the first ADR it implements.
+  for (const spec of specs) layout[spec.id] ??= { x: SPEC_COLUMN, y: layout[spec.implements[0]]?.y ?? 0 }
   out.set(LAYOUT, `${JSON.stringify(layout, null, 2)}\n`)
   return out
 }

@@ -6,7 +6,7 @@ status: implemented
 date: 2026-10-30
 implements: [ADR-007]
 adr_rev:
-  ADR-007: b1e1164e1e20d683c0065af95480a8bc9e88e63a
+  ADR-007: 12cdacbc576cff3958c808c03f2ab0725f7662d7
 ---
 
 ## Scope
