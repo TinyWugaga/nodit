@@ -34,6 +34,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "preview": "vite preview",
+    "sync:example": "tsx scripts/sync-example.ts",
     "build:server": "esbuild server/cli.ts --bundle --platform=node --format=esm --target=node22 --packages=external --outfile=dist-server/cli.mjs",
     "prepack": "npm run build"
   },

@@ -60,7 +60,6 @@ Nodit 原本把資料存在瀏覽器 localStorage，跟實際專案脫節。要�
   - 卡片代號在 token 層轉成連結，不碰 code 與既有連結。
   - mermaid 用 `securityLevel: 'strict'` 與 `htmlLabels: false`，輸出的 SVG 再用 SVG profile 清洗。
 
-
 ### 已知限制
 
 - 外部編輯器不配合鎖定時，revision 檢查擋不住同時寫入，沒有完全原子的 compare-and-swap。

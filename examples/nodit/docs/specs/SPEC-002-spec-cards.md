@@ -6,7 +6,7 @@ status: draft
 date: 2026-10-30
 implements: [ADR-009]
 adr_rev:
-  ADR-009: dc00e92a22e45a01be1821040a6b74c98a17f62f
+  ADR-009: 82e25e1830345041e8f66a53aba93821c801a5a7
 ---
 
 ## Scope
@@ -29,7 +29,7 @@ adr_rev:
 - **指紋**：`core/parse.ts` 的 `bodyBlobHash` 對 frontmatter 之後的位元組算 git blob hash；沒有 frontmatter 時算整份檔案。只改 ADR 的 status 不會讓 Spec 過期。
 - **linking pass**：`core/spec.ts` 的 `linkSpecs(docs)` 在 `crossValidate` 最後執行，為每份 Spec 產生 `specAdrs: { id, state, docKey? }[]`：
   - 狀態為 `current` / `stale` / `unrecorded` / `missing` / `invalid`。
-  - Spec 是 `approved` 或 `implemented`，而 implements 的 ADR 不是 `accepted` 時，發出 `spec-adr-not-accepted` warning；ADR 無效時跳過。
+  - Spec 是 `approved` 或 `implemented`，而 implements 的 ADR 不是 `accepted` 時，發出 `spec-adr-not-accepted` warning；ADR 無效時跳過。訊息依 ADR 狀態區分：`proposed` 是「尚未確認」，`deprecated`／`superseded` 建議把 Spec 標為 `outdated`。
   - ProjectService 把 diagnostics 與 `specAdrs` 一起比對，只改 ADR 時也會推送更新。
 - **驗證**：`adr_rev` 格式或值錯誤時發出 `spec-rev-invalid`（error）；key 不在 implements 裡時發出 `spec-rev-unknown`（warning）。
 - **CLI**：`nodit rev <ID>` 印出目前內容指紋；找不到、或同一個 ID 的檔案無法解析時，以非零狀態結束、不輸出指紋。

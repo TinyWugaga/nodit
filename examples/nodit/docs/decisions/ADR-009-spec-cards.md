@@ -2,15 +2,15 @@
 id: ADR-009
 type: adr
 title: Spec 卡片：ADR 與實作之間的技術規格
-status: proposed
+status: accepted
 date: 2026-10-26
-relates: [ADR-002, ADR-003, ADR-007]
+relates: [ADR-003, ADR-007]
 ---
 
 ## Context
 
-- 狀態：Proposed
-- 日期：2026-10-26（同日修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review.md` 的 7 項 findings；2026-10-29 修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review-2.md` 的 2 項 findings；同日再修訂：處理 `docs/reviews/2026-10-29-0009-spec-cards-review-3.md` 的 3 項 findings）
+- 狀態：Accepted（2026-10-29）
+- 日期：2026-10-26（同日修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review.md` 的 7 項 findings；2026-10-29 修訂：處理 `docs/reviews/2026-10-26-0009-spec-cards-review-2.md` 的 2 項 findings；同日再修訂：處理 `docs/reviews/2026-10-29-0009-spec-cards-review-3.md` 的 3 項 findings；同日再修訂：補 `spec-adr-not-accepted` 依 ADR status 區分訊息、`supersede-status` 的收集迴圈、Task 提示的連線種類）
 - 延伸：0003 的資料來源與寫入協定、0007 的過期判定
 
 - ADR 回答「為什麼、決定了什麼」，Task 回答「做哪一件事」。兩者中間缺「具體怎麼做」：介面、資料結構、邊界條件、驗收條件。現在這些資訊不是塞進 Task 的 `Description`，就是留在 AI 對話裡，對話結束就消失。
@@ -61,7 +61,7 @@ relates: [ADR-002, ADR-003, ADR-007]
 
   - 目前 `inferLinkKind` 把同 kind 的非 ADR 連線一律推為 `depends`，Spec 沒有 `depends`，所以要把 spec 加入例外，跟 ADR 一樣推為 `relates`。`supersedes` 不推斷，由人在 Inspector 明確選擇。
   - 驗收：四種 kind（adr、milestone、task、spec）兩兩配對、含同 kind 與兩個方向，共 16 種拉線，推斷結果都必須是 `LINK_SCHEMA` 允許的關係。用測試逐一列舉，不靠人工檢查。
-- 新 Spec 取代舊 Spec 的規則與 ADR 相同：新 Spec 寫 `supersedes`，舊 Spec 的 `status` 改成 `outdated`。`supersede-status` 診斷目前寫死只看 ADR 與 `superseded`（`core/scan.ts`），要改成依 kind 查「被取代時應有的 status」：adr → `superseded`，spec → `outdated`。
+- 新 Spec 取代舊 Spec 的規則與 ADR 相同：新 Spec 寫 `supersedes`，舊 Spec 的 `status` 改成 `outdated`。`supersede-status` 診斷目前寫死只看 ADR 與 `superseded`（`core/scan.ts`），兩處都要改：收集 `supersededBy` 的迴圈只收 ADR 的 `supersedes`，要改成收 adr 與 spec；判斷時依 kind 查「被取代時應有的 status」：adr → `superseded`，spec → `outdated`。只改後者時 spec 的 `supersedes` 不會被收集，診斷永遠不觸發。
 
 ### 過期判定：ADR body 指紋
 
@@ -154,14 +154,17 @@ relates: [ADR-002, ADR-003, ADR-007]
 Nodit 是文件編輯器，不是 workflow engine。「ADR 確認後才寫 Spec」「Spec 確認後才開 Task」這類順序不在 UI 擋下，改用以下方式引導：
 
 - **`nodit-spec` Claude skill**：引導 AI 讀 ADR、用 `nodit rev` 取得 `adr_rev`、寫 Spec，並在需要時依 `Acceptance Criteria` 開 Task（`nodit new task --implements SPEC-xxx`）。修訂時遵守上方「修訂與重新確認」。
-- **診斷 `spec-adr-not-accepted`（warning）**：Spec 的 `status` 是 `approved` 或 `implemented`，但它 implements 的 ADR 還不是 `accepted`。ADR 是 invalid 時不判斷，避免依據保留的舊 card 誤報或漏報。這是跨文件診斷，要加入 `server/project.ts` 的 `CROSS_CODES`，ADR 改成 accepted 後 warning 才會清除。
-- **Task 的 Inspector 提示**：Task implements 的 ADR 底下有 `approved` 的 Spec，而 Task 沒有連到該 ADR 的任何 Spec 時，顯示「ADR-xxx 有可參考的 Spec：SPEC-yyy」。這是給人參考的資訊，不是診斷，因為 Nodit 無法判斷 Spec 的範圍是否涵蓋這張 Task。
+- **診斷 `spec-adr-not-accepted`（warning）**：Spec 的 `status` 是 `approved` 或 `implemented`，但它 implements 的 ADR 不是 `accepted`。訊息依 ADR 的 status 區分，因為兩種情況要做的事不同：
+  - `proposed`：「ADR-xxx 尚未確認」。處理方式是等 ADR 確認，或把 Spec 退回 `draft`。
+  - `deprecated`／`superseded`：「ADR-xxx 已廢止或被取代，考慮把 Spec 標為 outdated」。處理方式是把 Spec 標為 `outdated`，或改 implements 取代它的 ADR。
+  - ADR 是 invalid 時不判斷，避免依據保留的舊 card 誤報或漏報。
+  - 這是跨文件診斷，要加入 `server/project.ts` 的 `CROSS_CODES`，ADR 狀態或 Spec 狀態改變後 warning 才會清除。
+- **Task 的 Inspector 提示**：Task implements 的 ADR 底下有 `approved` 的 Spec，而 Task 沒有 `implements` 該 ADR 底下的任何 Spec 時，顯示「ADR-xxx 有可參考的 Spec：SPEC-yyy」。只計 `implements`，`relates` 不算，與「完成判斷只計直接 implements」一致。這是給人參考的資訊，不是診斷，因為 Nodit 無法判斷 Spec 的範圍是否涵蓋這張 Task。
 - Spec 本身的 `adr_rev` 過期不另開診斷，由過期狀態顯示。
 
 ### Review
 
 Spec 可以當 review target。`review-target-invalid` 的 ID 檢查已經用 `kindOfId`，`ID_RULES` 加入 spec 後自動涵蓋 `SPEC-`。`/nodit-review`、`/nodit-review-resolve` 的流程不用改，只需要在規則裡把 Spec 列進可評估的卡片。
-
 
 ### 替代方案
 

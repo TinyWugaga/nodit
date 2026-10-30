@@ -11,7 +11,6 @@ status: addressed
 
 評估日期：2026-10-26。範圍：0009、0003、0007，以及本地 domain、parser、review、ProjectService 與 Markdown renderer。這是專案 ADR 的一般審查文件；0009 沒有 Nodit frontmatter ID，因此不虛構 `target: ADR-009`。
 
-
 建議採納 Spec 獨立成卡片的方向，但 0009 暫留 Proposed，先處理下列 P1。多張 Task 共用設計、Spec 可供 review、允許小改動跳過 Spec，都符合目前以 Markdown 為真相的定位。不自動推導 status、不追蹤 Task 對 Spec 的 hash，以及共用 checklist parser，都是合理的初版取捨。
 
 核心風險不是多一種 CardKind，而是關係語意與派生狀態尚未形成完整契約。以下是建議，尚未代替使用者做方向性決定。
